@@ -9,6 +9,15 @@ local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
 local Debris = game:GetService("Debris")
+local VirtualUser = game:GetService("VirtualUser")
+
+_G.notificationsEnabled = true
+
+local function myNotify(options)
+    if _G.notificationsEnabled then
+        PRISM:Notify(options)
+    end
+end
 
 local Window = PRISM:CreateWindow({
    Name = "🔥 Prism | Universal 🔫",
@@ -40,7 +49,7 @@ local Window = PRISM:CreateWindow({
 local HomeTab = Window:CreateTab("🏠 Home", nil)
 local MainSection = HomeTab:CreateSection("Main")
 
-PRISM:Notify({
+myNotify({
    Title = "Welcome to Prism Universal",
    Content = "GUI loaded! Use tabs to access features.",
    Duration = 5,
@@ -75,25 +84,21 @@ local function startFly()
         humanoid.WalkSpeed = 0
     end
 
-    -- Lift player slightly with tween for smoothness
     local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     local tween = TweenService:Create(humanoidRootPart, tweenInfo, {CFrame = humanoidRootPart.CFrame + Vector3.new(0, 5, 0)})
     tween:Play()
 
-    -- Create BodyGyro for rotation
     bodyGyro = Instance.new("BodyGyro")
     bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
     bodyGyro.P = 9e4
     bodyGyro.CFrame = Camera.CFrame
     bodyGyro.Parent = humanoidRootPart
 
-    -- Create BodyVelocity for movement
     bodyVelocity = Instance.new("BodyVelocity")
     bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
     bodyVelocity.Velocity = Vector3.new(0, 0, 0)
     bodyVelocity.Parent = humanoidRootPart
 
-    -- Movement controls
     local keys = {Forward = 0, Backward = 0, Left = 0, Right = 0, Up = 0, Down = 0}
     
     flyConnections.inputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -115,13 +120,12 @@ local function startFly()
         if input.KeyCode == Enum.KeyCode.LeftShift then keys.Down = 0 end
     end)
 
-    flyConnections.render = RunService.RenderStepped:Connect(function(delta)
+    flyConnections.render = RunService.RenderStepped:Connect(function()
         if _G.flyEnabled and bodyGyro and bodyVelocity then
             bodyGyro.CFrame = Camera.CFrame
-            local moveDirection = Vector3.new(keys.Left + keys.Right, keys.Up + keys.Down, keys.Backward + keys.Forward)
+            local moveDirection = Vector3.new(keys.Left + keys.Right, keys.Up + keys.Down, -(keys.Forward + keys.Backward))
             if moveDirection.Magnitude > 0 then
-                local velocity = (Camera.CFrame * CFrame.new(moveDirection)).Position - humanoidRootPart.Position
-                bodyVelocity.Velocity = velocity.Unit * flySpeed
+                bodyVelocity.Velocity = Camera.CFrame:VectorToWorldSpace(moveDirection.Unit) * flySpeed
             else
                 bodyVelocity.Velocity = Vector3.new(0, 0, 0)
             end
@@ -157,7 +161,7 @@ local function toggleFly()
     _G.flyEnabled = not _G.flyEnabled
     if _G.flyEnabled then
         startFly()
-        PRISM:Notify({
+        myNotify({
             Title = "Fly",
             Content = "Flying enabled! Use WASD, Space (up), Shift (down).",
             Duration = 3,
@@ -165,7 +169,7 @@ local function toggleFly()
         })
     else
         stopFly()
-        PRISM:Notify({
+        myNotify({
             Title = "Fly",
             Content = "Flying disabled!",
             Duration = 3,
@@ -177,30 +181,35 @@ end
 -- Noclip Functionality
 _G.noclipEnabled = false
 local noclipConnection
+local collisionParts = {}
 
-local function setCollision(state)
-    local character = Players.LocalPlayer.Character
-    if not character then return end
+local function collectCollisionParts(character)
+    collisionParts = {}
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
-            part.CanCollide = state
+            table.insert(collisionParts, part)
         end
     end
 end
 
+local function setCollision(state)
+    for _, part in pairs(collisionParts) do
+        part.CanCollide = state
+    end
+end
+
 local function startNoclip()
+    local character = Players.LocalPlayer.Character
+    if not character then return end
     _G.noclipEnabled = true
+    collectCollisionParts(character)
     setCollision(false)
     noclipConnection = RunService.Stepped:Connect(function()
         if _G.noclipEnabled then
-            -- Minimal check, no full loop every frame
-            local character = Players.LocalPlayer.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0) -- Prevent falling if needed
-            end
+            setCollision(false)
         end
     end)
-    PRISM:Notify({
+    myNotify({
         Title = "Noclip",
         Content = "Noclip enabled! You can pass through objects.",
         Duration = 3,
@@ -215,7 +224,8 @@ local function stopNoclip()
         noclipConnection = nil
     end
     setCollision(true)
-    PRISM:Notify({
+    collisionParts = {}
+    myNotify({
         Title = "Noclip",
         Content = "Noclip disabled!",
         Duration = 3,
@@ -298,7 +308,7 @@ local function triggerInteraction()
         elseif closestPart:IsA("BasePart") then
             pcall(function() closestPart:Activate() end)
         end
-        PRISM:Notify({
+        myNotify({
             Title = "Interaction",
             Content = "Interacted with " .. closestPart.Name,
             Duration = 3,
@@ -313,7 +323,7 @@ local function updateInteractables()
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     local root = character.HumanoidRootPart
     local region = Region3.new(root.Position - Vector3.new(interactDistance, interactDistance, interactDistance), root.Position + Vector3.new(interactDistance, interactDistance, interactDistance))
-    local parts = workspace:FindPartsInRegion3(region, character, 100) -- Limit to 100 parts for performance
+    local parts = workspace:FindPartsInRegion3(region, character, 100)
     for _, part in pairs(parts) do
         if isInteractable(part) then
             highlightInteractable(part)
@@ -321,7 +331,6 @@ local function updateInteractables()
             removeHighlight(part)
         end
     end
-    -- Clean up old highlights not in range
     for part, _ in pairs(interactableParts) do
         if (part.Position - root.Position).Magnitude > interactDistance then
             removeHighlight(part)
@@ -351,7 +360,7 @@ local function killAll()
             end
         end
     end
-    PRISM:Notify({
+    myNotify({
         Title = "Kill All",
         Content = "Attempted to kill all players!",
         Duration = 3,
@@ -570,7 +579,7 @@ local SpiderClimbToggle = MovementTab:CreateToggle({
 })
 
 local function getPlayerNames()
-    local names = {}
+    local names = {"Nobody"}
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= Players.LocalPlayer then
             table.insert(names, player.Name)
@@ -582,22 +591,24 @@ end
 local TeleportDropdown = MovementTab:CreateDropdown({
    Name = "Teleport to Player",
    Options = getPlayerNames(),
-   CurrentOption = {""},
+   CurrentOption = {"Nobody"},
    MultipleOptions = false,
    Flag = "teleportplayer",
    Callback = function(Option)
+       if Option[1] == "Nobody" then return end
        local targetPlayer = Players:FindFirstChild(Option[1])
        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
            local tween = TweenService:Create(Players.LocalPlayer.Character.HumanoidRootPart, tweenInfo, {CFrame = targetPlayer.Character.HumanoidRootPart.CFrame})
            tween:Play()
-           PRISM:Notify({
+           myNotify({
                Title = "Teleport",
                Content = "Teleported to " .. targetPlayer.Name,
                Duration = 3,
                Image = 13047715178
            })
        end
+       TeleportDropdown:Set({"Nobody"})
    end
 })
 
@@ -622,14 +633,16 @@ local espFeatures = {
     textOutline = true,
     useTeamColors = false,
     skeleton = false,
-    item = false
+    item = false,
+    chams = false
 }
 local espColors = {
     box = Color3.fromRGB(255, 255, 255),
     text = Color3.fromRGB(255, 255, 255),
     tracer = Color3.fromRGB(255, 255, 255),
     skeleton = Color3.fromRGB(255, 255, 255),
-    item = Color3.fromRGB(0, 255, 0)
+    item = Color3.fromRGB(0, 255, 0),
+    chams = Color3.fromRGB(255, 0, 0)
 }
 local playerESP = {}
 local itemESP = {}
@@ -646,15 +659,46 @@ end
 
 local function createBox(player)
     if not shouldShowESP(player) or not player.Character then return end
-    local box = Instance.new("SelectionBox")
-    box.Name = "ESPBox"
-    box.Adornee = player.Character
-    box.Color3 = getESPColor(player) or espColors.box
-    box.LineThickness = 0.05
-    box.SurfaceTransparency = 1
-    box.Parent = player.Character
+    local box = Drawing.new("Quad")
+    box.Visible = false
+    box.Color = getESPColor(player) or espColors.box
+    box.Thickness = 1
+    box.Transparency = 1
+    box.Filled = false
     if not playerESP[player] then playerESP[player] = {} end
     playerESP[player].box = box
+end
+
+local function updateBox(player)
+    if playerESP[player] and playerESP[player].box and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Head") then
+        local box = playerESP[player].box
+        local rootPos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+        if not onScreen then
+            box.Visible = false
+            return
+        end
+        local headPos = Camera:WorldToViewportPoint(player.Character.Head.Position + Vector3.new(0, 0.5, 0))
+        local legPos = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position - Vector3.new(0, 4, 0))
+        local leftPos = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position - Camera.CFrame.RightVector * 2)
+        local rightPos = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position + Camera.CFrame.RightVector * 2)
+        local top = Vector2.new((leftPos.X + rightPos.X) / 2, headPos.Y)
+        local bottom = Vector2.new((leftPos.X + rightPos.X) / 2, legPos.Y)
+        local width = math.abs(leftPos.X - rightPos.X) * 1.2
+        local topLeft = Vector2.new(top.X - width / 2, top.Y)
+        local topRight = Vector2.new(top.X + width / 2, top.Y)
+        local bottomLeft = Vector2.new(bottom.X - width / 2, bottom.Y)
+        local bottomRight = Vector2.new(bottom.X + width / 2, bottom.Y)
+        box.PointA = topLeft
+        box.PointB = topRight
+        box.PointC = bottomRight
+        box.PointD = bottomLeft
+        box.Color = getESPColor(player) or espColors.box
+        box.Visible = true
+    else
+        if playerESP[player] and playerESP[player].box then
+            playerESP[player].box.Visible = false
+        end
+    end
 end
 
 local function createTextESP(player)
@@ -662,14 +706,15 @@ local function createTextESP(player)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "ESPText"
     billboard.Adornee = player.Character.Head
-    billboard.Size = UDim2.new(0, 200, 0, 100)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.Size = UDim2.new(0, 150, 0, 60)
+    billboard.StudsOffset = Vector3.new(0, 4, 0)
     billboard.AlwaysOnTop = true
     local text = Instance.new("TextLabel")
     text.Size = UDim2.new(1, 0, 1, 0)
     text.BackgroundTransparency = 1
     text.TextColor3 = getESPColor(player) or espColors.text
     text.TextSize = 14
+    text.Font = Enum.Font.SourceSansBold
     text.TextStrokeTransparency = espFeatures.textOutline and 0 or 1
     text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     text.TextYAlignment = Enum.TextYAlignment.Top
@@ -686,7 +731,7 @@ local function updateTextESP(player)
             table.insert(lines, player.Name)
         end
         if espFeatures.distance then
-            local dist = math.floor((Players.LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude)
+            local dist = math.floor((Players.LocalPlayer.Character and Players.LocalPlayer.Character.HumanoidRootPart and player.Character.HumanoidRootPart and (Players.LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude) or 0)
             table.insert(lines, dist .. " studs")
         end
         if espFeatures.health then
@@ -722,6 +767,10 @@ local function updateTracer(player)
         tracer.To = Vector2.new(screenPos.X, screenPos.Y)
         tracer.Color = getESPColor(player) or espColors.tracer
         tracer.Visible = onScreen
+    else
+        if playerESP[player] and playerESP[player].tracer then
+            playerESP[player].tracer.Visible = false
+        end
     end
 end
 
@@ -746,31 +795,38 @@ end
 local function updateSkeleton(player)
     if playerESP[player] and playerESP[player].skeleton and player.Character then
         local connections = {
-            Head = "UpperTorso",
-            UpperTorso = "LowerTorso",
-            UpperTorso = "LeftUpperArm",
-            UpperTorso = "RightUpperArm",
-            LeftUpperArm = "LeftLowerArm",
-            RightUpperArm = "RightLowerArm",
-            LeftLowerArm = "LeftHand",
-            RightLowerArm = "RightHand",
-            LowerTorso = "LeftUpperLeg",
-            LowerTorso = "RightUpperLeg",
-            LeftUpperLeg = "LeftLowerLeg",
-            RightUpperLeg = "RightLowerLeg",
-            LeftLowerLeg = "LeftFoot",
-            RightLowerLeg = "RightFoot"
+            ["Head"] = "UpperTorso",
+            ["UpperTorso"] = "LowerTorso",
+            ["UpperTorso"] = "LeftUpperArm",
+            ["UpperTorso"] = "RightUpperArm",
+            ["LeftUpperArm"] = "LeftLowerArm",
+            ["RightUpperArm"] = "RightLowerArm",
+            ["LeftLowerArm"] = "LeftHand",
+            ["RightLowerArm"] = "RightHand",
+            ["LowerTorso"] = "LeftUpperLeg",
+            ["LowerTorso"] = "RightUpperLeg",
+            ["LeftUpperLeg"] = "LeftLowerLeg",
+            ["RightUpperLeg"] = "RightLowerLeg",
+            ["LeftLowerLeg"] = "LeftFoot",
+            ["RightLowerLeg"] = "RightFoot"
         }
         for fromPart, toPart in pairs(connections) do
             if player.Character:FindFirstChild(fromPart) and player.Character:FindFirstChild(toPart) then
-                local fromPos = Camera:WorldToViewportPoint(player.Character[fromPart].Position)
-                local toPos = Camera:WorldToViewportPoint(player.Character[toPart].Position)
+                local fromPos, fromOn = Camera:WorldToViewportPoint(player.Character[fromPart].Position)
+                local toPos, toOn = Camera:WorldToViewportPoint(player.Character[toPart].Position)
                 local line = playerESP[player].skeleton[fromPart] or playerESP[player].skeleton[toPart]
                 if line then
                     line.From = Vector2.new(fromPos.X, fromPos.Y)
                     line.To = Vector2.new(toPos.X, toPos.Y)
-                    line.Visible = fromPos.Z > 0 and toPos.Z > 0
+                    line.Color = getESPColor(player) or espColors.skeleton
+                    line.Visible = fromOn and toOn
                 end
+            end
+        end
+    else
+        if playerESP[player] and playerESP[player].skeleton then
+            for _, line in pairs(playerESP[player].skeleton) do
+                line.Visible = false
             end
         end
     end
@@ -811,39 +867,78 @@ local function removeItemESP(item)
     end
 end
 
-local function toggleESPFeature(feature)
-    espFeatures[feature] = not espFeatures[feature]
-    if espFeatures[feature] then
+local function addChams(player)
+    if not shouldShowESP(player) or not player.Character then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ChamsHighlight"
+    highlight.Adornee = player.Character
+    highlight.FillColor = getESPColor(player) or espColors.chams
+    highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = player.Character
+    if not playerESP[player] then playerESP[player] = {} end
+    playerESP[player].chams = highlight
+end
+
+local function removeChams(player)
+    if playerESP[player] and playerESP[player].chams then
+        playerESP[player].chams:Destroy()
+        playerESP[player].chams = nil
+    end
+end
+
+local function toggleESPFeature(feature, value)
+    espFeatures[feature] = value
+    if value then
         if feature == "item" then
             for _, item in pairs(workspace:GetDescendants()) do
-                if item:IsA("BasePart") and item.Name:lower():match("item") or item.Name:lower():match("tool") then
+                if item:IsA("BasePart") and (item.Name:lower():match("item") or item.Name:lower():match("tool")) then
                     createItemESP(item)
                 end
             end
-            workspace.DescendantAdded:Connect(function(item)
-                if espFeatures.item and item:IsA("BasePart") and item.Name:lower():match("item") or item.Name:lower():match("tool") then
+            local itemAddedConn = workspace.DescendantAdded:Connect(function(item)
+                if espFeatures.item and item:IsA("BasePart") and (item.Name:lower():match("item") or item.Name:lower():match("tool")) then
                     createItemESP(item)
                 end
             end)
-            workspace.DescendantRemoving:Connect(function(item)
+            local itemRemovingConn = workspace.DescendantRemoving:Connect(function(item)
                 removeItemESP(item)
             end)
+            if not playerESP.connections then playerESP.connections = {} end
+            table.insert(playerESP.connections, itemAddedConn)
+            table.insert(playerESP.connections, itemRemovingConn)
+        elseif feature == "chams" then
+            for _, player in pairs(Players:GetPlayers()) do
+                if shouldShowESP(player) and player.Character then
+                    addChams(player)
+                end
+            end
+            local addedConn = Players.PlayerAdded:Connect(function(player)
+                if shouldShowESP(player) then
+                    player.CharacterAdded:Connect(function()
+                        if espFeatures.chams then
+                            addChams(player)
+                        end
+                    end)
+                end
+            end)
+            if not playerESP.connections then playerESP.connections = {} end
+            table.insert(playerESP.connections, addedConn)
         else
             for _, player in pairs(Players:GetPlayers()) do
-                if shouldShowESP(player) then
+                if shouldShowESP(player) and player.Character then
                     if feature == "box" then createBox(player) end
                     if feature == "tracers" then createTracer(player) end
                     if feature == "skeleton" then createSkeleton(player) end
                     if feature == "name" or feature == "distance" or feature == "health" then
-                        if not playerESP[player] or not playerESP[player].text then
-                            createTextESP(player)
-                        end
+                        createTextESP(player)
                         updateTextESP(player)
                     end
                 end
             end
         end
-        PRISM:Notify({
+        myNotify({
             Title = "ESP",
             Content = feature:gsub("^%l", string.upper) .. " enabled!",
             Duration = 3,
@@ -854,43 +949,41 @@ local function toggleESPFeature(feature)
             for item, _ in pairs(itemESP) do
                 removeItemESP(item)
             end
+        elseif feature == "chams" then
+            for _, player in pairs(Players:GetPlayers()) do
+                removeChams(player)
+            end
         else
             for _, player in pairs(Players:GetPlayers()) do
-                if feature == "box" then removeESPFeature(player, "box") end
-                if feature == "tracers" then removeESPFeature(player, "tracer") end
-                if feature == "skeleton" then
-                    if playerESP[player] and playerESP[player].skeleton then
+                if playerESP[player] then
+                    if feature == "box" and playerESP[player].box then
+                        playerESP[player].box:Remove()
+                        playerESP[player].box = nil
+                    elseif feature == "tracers" and playerESP[player].tracer then
+                        playerESP[player].tracer:Remove()
+                        playerESP[player].tracer = nil
+                    elseif feature == "skeleton" and playerESP[player].skeleton then
                         for _, line in pairs(playerESP[player].skeleton) do
                             line:Remove()
                         end
                         playerESP[player].skeleton = nil
-                    end
-                end
-                if feature == "name" or feature == "distance" or feature == "health" then
-                    updateTextESP(player)
-                    if not espFeatures.name and not espFeatures.distance and not espFeatures.health then
-                        removeESPFeature(player, "text")
+                    elseif feature == "name" or feature == "distance" or feature == "health" then
+                        if playerESP[player].text and not (espFeatures.name or espFeatures.distance or espFeatures.health) then
+                            playerESP[player].text.gui:Destroy()
+                            playerESP[player].text = nil
+                        else
+                            updateTextESP(player)
+                        end
                     end
                 end
             end
         end
-        PRISM:Notify({
+        myNotify({
             Title = "ESP",
             Content = feature:gsub("^%l", string.upper) .. " disabled!",
             Duration = 3,
             Image = 13047715178
         })
-    end
-end
-
-local function removeESPFeature(player, feature)
-    if playerESP[player] and playerESP[player][feature] then
-        if playerESP[player][feature].Destroy then
-            playerESP[player][feature]:Destroy()
-        elseif playerESP[player][feature].Remove then
-            playerESP[player][feature]:Remove()
-        end
-        playerESP[player][feature] = nil
     end
 end
 
@@ -904,45 +997,50 @@ end
 
 RunService.RenderStepped:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
-        if espFeatures.distance or espFeatures.health or espFeatures.name then updateTextESP(player) end
-        if espFeatures.tracers then updateTracer(player) end
-        if espFeatures.skeleton then updateSkeleton(player) end
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if espFeatures.box then updateBox(player) end
+            if espFeatures.tracers then updateTracer(player) end
+            if espFeatures.skeleton then updateSkeleton(player) end
+            if espFeatures.name or espFeatures.distance or espFeatures.health then updateTextESP(player) end
+        end
     end
     updateInteractables()
 end)
 
 Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        if shouldShowESP(player) then
-            if espFeatures.box then createBox(player) end
-            if espFeatures.tracers then createTracer(player) end
-            if espFeatures.skeleton then createSkeleton(player) end
-            if espFeatures.name or espFeatures.distance or espFeatures.health then 
-                createTextESP(player)
-                updateTextESP(player)
+    if shouldShowESP(player) then
+        player.CharacterAdded:Connect(function(character)
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                if espFeatures.box then createBox(player) end
+                if espFeatures.tracers then createTracer(player) end
+                if espFeatures.skeleton then createSkeleton(player) end
+                if espFeatures.chams then addChams(player) end
+                if espFeatures.name or espFeatures.distance or espFeatures.health then
+                    createTextESP(player)
+                    updateTextESP(player)
+                end
             end
-        end
-    end)
-    player:GetPropertyChangedSignal("Team"):Connect(function()
-        for feature in pairs(playerESP[player] or {}) do
-            removeESPFeature(player, feature)
-        end
-        if shouldShowESP(player) then
-            if espFeatures.box then createBox(player) end
-            if espFeatures.tracers then createTracer(player) end
-            if espFeatures.skeleton then createSkeleton(player) end
-            if espFeatures.name or espFeatures.distance or espFeatures.health then 
-                createTextESP(player)
-                updateTextESP(player)
-            end
-        end
-    end)
+        end)
+    end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
     if playerESP[player] then
-        for feature in pairs(playerESP[player]) do
-            removeESPFeature(player, feature)
+        for _, feature in pairs({"box", "tracer", "skeleton", "text", "chams"}) do
+            if playerESP[player][feature] then
+                if feature == "box" or feature == "tracer" then
+                    playerESP[player][feature]:Remove()
+                elseif feature == "skeleton" then
+                    for _, line in pairs(playerESP[player].skeleton) do
+                        line:Remove()
+                    end
+                elseif feature == "text" then
+                    playerESP[player].text.gui:Destroy()
+                elseif feature == "chams" then
+                    playerESP[player].chams:Destroy()
+                end
+                playerESP[player][feature] = nil
+            end
         end
         playerESP[player] = nil
     end
@@ -954,7 +1052,7 @@ local BoxToggle = VisualsTab:CreateToggle({
    CurrentValue = false,
    Flag = "boxesp",
    Callback = function(Value)
-       toggleESPFeature("box")
+       toggleESPFeature("box", Value)
    end,
 })
 
@@ -966,7 +1064,7 @@ local BoxColorPicker = VisualsTab:CreateColorPicker({
        espColors.box = Color
        for player, esp in pairs(playerESP) do
            if esp.box then
-               esp.box.Color3 = getESPColor(player) or Color
+               esp.box.Color = getESPColor(player) or Color
            end
        end
    end
@@ -977,7 +1075,7 @@ local NameToggle = VisualsTab:CreateToggle({
    CurrentValue = false,
    Flag = "nameesp",
    Callback = function(Value)
-       toggleESPFeature("name")
+       toggleESPFeature("name", Value)
    end,
 })
 
@@ -986,7 +1084,7 @@ local DistanceToggle = VisualsTab:CreateToggle({
    CurrentValue = false,
    Flag = "distanceesp",
    Callback = function(Value)
-       toggleESPFeature("distance")
+       toggleESPFeature("distance", Value)
    end,
 })
 
@@ -995,7 +1093,7 @@ local HealthToggle = VisualsTab:CreateToggle({
    CurrentValue = false,
    Flag = "healthesp",
    Callback = function(Value)
-       toggleESPFeature("health")
+       toggleESPFeature("health", Value)
    end,
 })
 
@@ -1028,7 +1126,7 @@ local TracersToggle = VisualsTab:CreateToggle({
    CurrentValue = false,
    Flag = "tracersesp",
    Callback = function(Value)
-       toggleESPFeature("tracers")
+       toggleESPFeature("tracers", Value)
    end,
 })
 
@@ -1051,7 +1149,7 @@ local SkeletonToggle = VisualsTab:CreateToggle({
    CurrentValue = false,
    Flag = "skeletonesp",
    Callback = function(Value)
-       toggleESPFeature("skeleton")
+       toggleESPFeature("skeleton", Value)
    end,
 })
 
@@ -1076,7 +1174,7 @@ local ItemESPToggle = VisualsTab:CreateToggle({
    CurrentValue = false,
    Flag = "itemesp",
    Callback = function(Value)
-       toggleESPFeature("item")
+       toggleESPFeature("item", Value)
    end,
 })
 
@@ -1093,6 +1191,29 @@ local ItemColorPicker = VisualsTab:CreateColorPicker({
    end
 })
 
+local ChamsToggle = VisualsTab:CreateToggle({
+   Name = "Chams",
+   CurrentValue = false,
+   Flag = "chams",
+   Callback = function(Value)
+       toggleESPFeature("chams", Value)
+   end,
+})
+
+local ChamsColorPicker = VisualsTab:CreateColorPicker({
+   Name = "Chams Color",
+   Color = Color3.fromRGB(255, 0, 0),
+   Flag = "chamscolor",
+   Callback = function(Color)
+       espColors.chams = Color
+       for player, esp in pairs(playerESP) do
+           if esp.chams then
+               esp.chams.FillColor = getESPColor(player) or Color
+           end
+       end
+   end
+})
+
 local TeamFilterToggle = VisualsTab:CreateToggle({
    Name = "Team Filter",
    CurrentValue = false,
@@ -1100,14 +1221,30 @@ local TeamFilterToggle = VisualsTab:CreateToggle({
    Callback = function(Value)
        espFeatures.teamFilter = Value
        for _, player in pairs(Players:GetPlayers()) do
-           for feature in pairs(playerESP[player] or {}) do
-               removeESPFeature(player, feature)
+           if playerESP[player] then
+               for feature in pairs(playerESP[player]) do
+                   if feature ~= "connections" then
+                       if feature == "box" or feature == "tracer" then
+                           playerESP[player][feature]:Remove()
+                       elseif feature == "skeleton" then
+                           for _, line in pairs(playerESP[player].skeleton) do
+                               line:Remove()
+                           end
+                       elseif feature == "text" then
+                           playerESP[player].text.gui:Destroy()
+                       elseif feature == "chams" then
+                           playerESP[player].chams:Destroy()
+                       end
+                       playerESP[player][feature] = nil
+                   end
+               end
            end
-           if shouldShowESP(player) then
+           if shouldShowESP(player) and player.Character then
                if espFeatures.box then createBox(player) end
                if espFeatures.tracers then createTracer(player) end
                if espFeatures.skeleton then createSkeleton(player) end
-               if espFeatures.name or espFeatures.distance or espFeatures.health then 
+               if espFeatures.chams then addChams(player) end
+               if espFeatures.name or espFeatures.distance or espFeatures.health then
                    createTextESP(player)
                    updateTextESP(player)
                end
@@ -1125,7 +1262,7 @@ local UseTeamColorsToggle = VisualsTab:CreateToggle({
        for _, player in pairs(Players:GetPlayers()) do
            if playerESP[player] then
                if playerESP[player].box then
-                   playerESP[player].box.Color3 = getESPColor(player) or espColors.box
+                   playerESP[player].box.Color = getESPColor(player) or espColors.box
                end
                if playerESP[player].text then
                    playerESP[player].text.label.TextColor3 = getESPColor(player) or espColors.text
@@ -1137,6 +1274,9 @@ local UseTeamColorsToggle = VisualsTab:CreateToggle({
                    for _, line in pairs(playerESP[player].skeleton) do
                        line.Color = getESPColor(player) or espColors.skeleton
                    end
+               end
+               if playerESP[player].chams then
+                   playerESP[player].chams.FillColor = getESPColor(player) or espColors.chams
                end
            end
        end
@@ -1156,33 +1296,6 @@ local FullbrightToggle = VisualsTab:CreateToggle({
            Lighting.Brightness = 1
            Lighting.GlobalShadows = true
            Lighting.FogEnd = 1000
-       end
-   end,
-})
-
-local ChamsToggle = VisualsTab:CreateToggle({
-   Name = "Chams",
-   CurrentValue = false,
-   Flag = "chams",
-   Callback = function(Value)
-       for _, player in pairs(Players:GetPlayers()) do
-           if player ~= Players.LocalPlayer and player.Character then
-               for _, part in pairs(player.Character:GetDescendants()) do
-                   if part:IsA("BasePart") then
-                       local highlight = part:FindFirstChild("ChamsHighlight")
-                       if Value and not highlight then
-                           highlight = Instance.new("Highlight")
-                           highlight.Name = "ChamsHighlight"
-                           highlight.FillColor = getESPColor(player) or espColors.box
-                           highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
-                           highlight.FillTransparency = 0.5
-                           highlight.Parent = part
-                       elseif not Value and highlight then
-                           highlight:Destroy()
-                       end
-                   end
-               end
-           end
        end
    end,
 })
@@ -1283,9 +1396,18 @@ local function getClosestPlayerInFOV()
             local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
             if onScreen then
                 local distance = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                if distance < closestDistance and (not aimbotVisibleCheck or onScreen) then
-                    closestDistance = distance
-                    closestPlayer = player
+                if distance < closestDistance then
+                    if not aimbotVisibleCheck then
+                        closestDistance = distance
+                        closestPlayer = player
+                    else
+                        local ray = Ray.new(Camera.CFrame.Position, (targetPos - Camera.CFrame.Position).Unit * 1000)
+                        local hit, _ = workspace:FindPartOnRayWithIgnoreList(ray, {localChar})
+                        if hit and hit:IsDescendantOf(player.Character) then
+                            closestDistance = distance
+                            closestPlayer = player
+                        end
+                    end
                 end
             end
         end
@@ -1307,7 +1429,7 @@ local function toggleAimbot(value)
                 end
             end
         end)
-        PRISM:Notify({
+        myNotify({
             Title = "Aimbot",
             Content = "Aimbot enabled! Hold right mouse to aim.",
             Duration = 3,
@@ -1318,7 +1440,7 @@ local function toggleAimbot(value)
             aimbotConnection:Disconnect()
             aimbotConnection = nil
         end
-        PRISM:Notify({
+        myNotify({
             Title = "Aimbot",
             Content = "Aimbot disabled!",
             Duration = 3,
@@ -1342,11 +1464,23 @@ local function toggleTriggerbot(value)
                 end
             end
         end)
+        myNotify({
+            Title = "Triggerbot",
+            Content = "Triggerbot enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     else
         if triggerbotConnection then
             triggerbotConnection:Disconnect()
             triggerbotConnection = nil
         end
+        myNotify({
+            Title = "Triggerbot",
+            Content = "Triggerbot disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -1363,11 +1497,23 @@ local function toggleAutoHeadshot(value)
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, headPos)
             end
         end)
+        myNotify({
+            Title = "Auto Headshot",
+            Content = "Auto Headshot enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     else
         if autoHeadshotConnection then
             autoHeadshotConnection:Disconnect()
             autoHeadshotConnection = nil
         end
+        myNotify({
+            Title = "Auto Headshot",
+            Content = "Auto Headshot disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -1389,11 +1535,23 @@ local function toggleSilentAim(value)
                 end
             end
         end)
+        myNotify({
+            Title = "Silent Aim",
+            Content = "Silent Aim enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     else
         if silentAimConnection then
             silentAimConnection:Disconnect()
             silentAimConnection = nil
         end
+        myNotify({
+            Title = "Silent Aim",
+            Content = "Silent Aim disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -1411,6 +1569,12 @@ local function toggleHitboxExpander(value)
             root.CanCollide = false
         end
     end
+    myNotify({
+        Title = "Hitbox Expander",
+        Content = "Hitbox Expander " .. (value and "enabled!" or "disabled!"),
+        Duration = 3,
+        Image = 13047715178
+    })
 end
 
 local rapidFireEnabled = false
@@ -1424,8 +1588,20 @@ local function toggleRapidFire(value)
                 tool:Activate()
             end
         end)
+        myNotify({
+            Title = "Rapid Fire",
+            Content = "Rapid Fire enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     else
         RunService:UnbindFromRenderStep("RapidFire")
+        myNotify({
+            Title = "Rapid Fire",
+            Content = "Rapid Fire disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -1556,6 +1732,7 @@ local HitboxSizeSlider = CombatTab:CreateSlider({
    Callback = function(Value)
        hitboxSize = Value
        if hitboxExpanderEnabled then
+           toggleHitboxExpander(false)
            toggleHitboxExpander(true)
        end
    end,
@@ -1571,6 +1748,7 @@ local HitboxTransparencySlider = CombatTab:CreateSlider({
    Callback = function(Value)
        hitboxTransparency = Value
        if hitboxExpanderEnabled then
+           toggleHitboxExpander(false)
            toggleHitboxExpander(true)
        end
    end,
@@ -1615,8 +1793,20 @@ local function toggleInfiniteAmmo(value)
                 end
             end
         end)
+        myNotify({
+            Title = "Infinite Ammo",
+            Content = "Infinite Ammo enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     else
         RunService:UnbindFromRenderStep("InfiniteAmmo")
+        myNotify({
+            Title = "Infinite Ammo",
+            Content = "Infinite Ammo disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -1633,8 +1823,20 @@ local function toggleNoRecoil(value)
                 end
             end
         end)
+        myNotify({
+            Title = "No Recoil",
+            Content = "No Recoil enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     else
         RunService:UnbindFromRenderStep("NoRecoil")
+        myNotify({
+            Title = "No Recoil",
+            Content = "No Recoil disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -1651,8 +1853,20 @@ local function toggleNoSpread(value)
                 end
             end
         end)
+        myNotify({
+            Title = "No Spread",
+            Content = "No Spread enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     else
         RunService:UnbindFromRenderStep("NoSpread")
+        myNotify({
+            Title = "No Spread",
+            Content = "No Spread disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -1665,8 +1879,20 @@ local function toggleGodMode(value)
                 humanoid.Health = humanoid.MaxHealth
             end
         end)
+        myNotify({
+            Title = "God Mode",
+            Content = "God Mode enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     else
         RunService:UnbindFromRenderStep("GodMode")
+        myNotify({
+            Title = "God Mode",
+            Content = "God Mode disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -1675,22 +1901,35 @@ local function toggleAntiAFK(value)
     if value then
         Players.LocalPlayer.Idled:Connect(function()
             if antiAFKEnabled then
-                game:GetService("VirtualUser"):CaptureController()
-                game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
             end
         end)
+        myNotify({
+            Title = "Anti-AFK",
+            Content = "Anti-AFK enabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
+    else
+        myNotify({
+            Title = "Anti-AFK",
+            Content = "Anti-AFK disabled!",
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
 local function giveItem(itemName)
     for _, v in pairs(ReplicatedStorage:GetDescendants()) do
-        if v:IsA("RemoteEvent") and v.Name:lower():match("give") or v.Name:lower():match("equip") then
+        if v:IsA("RemoteEvent") and (v.Name:lower():match("give") or v.Name:lower():match("equip")) then
             pcall(function()
                 v:FireServer(itemName)
             end)
         end
     end
-    PRISM:Notify({
+    myNotify({
         Title = "Give Item",
         Content = "Attempted to give item: " .. itemName,
         Duration = 3,
@@ -1699,20 +1938,25 @@ local function giveItem(itemName)
 end
 
 local function serverCrash()
-    local crashTable = {}
-    for i = 1, 1000 do
-        table.insert(crashTable, string.rep("crash", 1000))
+    local crashPayload = {}
+    for i = 1, 500 do
+        table.insert(crashPayload, string.rep(tostring(math.huge), 100))
     end
-    while true do
-        for _, v in pairs(ReplicatedStorage:GetDescendants()) do
-            if v:IsA("RemoteEvent") then
+    for _, v in pairs(ReplicatedStorage:GetDescendants()) do
+        if v:IsA("RemoteEvent") then
+            for i = 1, 50 do
                 pcall(function()
-                    v:FireServer(crashTable)
+                    v:FireServer(crashPayload, math.huge, nil, {})
                 end)
             end
         end
-        task.wait(0.1) -- Slight delay to reduce lag
     end
+    myNotify({
+        Title = "Server Crash",
+        Content = "Server crash attempt completed!",
+        Duration = 3,
+        Image = 13047715178
+    })
 end
 
 local InfiniteAmmoToggle = ExploitsTab:CreateToggle({
@@ -1772,13 +2016,13 @@ local GiveItemInput = ExploitsTab:CreateInput({
 local ServerCrashButton = ExploitsTab:CreateButton({
    Name = "Server Crash (WARNING)",
    Callback = function()
-       PRISM:Notify({
+       myNotify({
            Title = "Server Crash",
            Content = "Attempting to crash server... Use with caution!",
            Duration = 3,
            Image = 13047715178
        })
-       spawn(serverCrash)
+       serverCrash()
    end,
 })
 
@@ -1788,6 +2032,12 @@ local ServerHopButton = ExploitsTab:CreateButton({
        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
        local serverId = servers.data[math.random(1, #servers.data)].id
        TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId)
+       myNotify({
+           Title = "Server Hop",
+           Content = "Hopping to a new server...",
+           Duration = 3,
+           Image = 13047715178
+       })
    end,
 })
 
@@ -1857,110 +2107,10 @@ local FPSUnlockerToggle = SettingsTab:CreateToggle({
        else
            setfpscap(60)
        end
-   end,
-})
-
-local AutoRejoinToggle = SettingsTab:CreateToggle({
-   Name = "Auto-Rejoin on Kick",
-   CurrentValue = false,
-   Flag = "autorejoin",
-   Callback = function(Value)
-       if Value then
-           game:GetService("CoreGui").RobloxPromptGui.promptOverlay.ChildAdded:Connect(function(child)
-               if child.Name == "ErrorPrompt" then
-                   TeleportService:Teleport(game.PlaceId)
-               end
-           end)
-       end
-   end,
-})
-
--- Config Label
-local ConfigLabelSettings = SettingsTab:CreateLabel("Configurations are automatically saved and loaded from PrismHub/Config.json")
-
--- Misc Tab
-local MiscTab = Window:CreateTab("📦 Misc", nil)
-local MiscSection = MiscTab:CreateSection("Options")
-
-local chatSpamEnabled = false
-local chatSpamMessage = "Prism Universal owns you!"
-local chatSpamDelay = 1
-
-local function toggleChatSpam(value)
-    chatSpamEnabled = value
-    if value then
-        spawn(function()
-            while chatSpamEnabled do
-                ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(chatSpamMessage, "All")
-                wait(chatSpamDelay)
-            end
-        end)
-    end
-end
-
-local ChatSpamToggle = MiscTab:CreateToggle({
-   Name = "Chat Spam",
-   CurrentValue = false,
-   Flag = "chatspam",
-   Callback = function(Value)
-       toggleChatSpam(Value)
-   end,
-})
-
-local ChatSpamInput = MiscTab:CreateInput({
-   Name = "Spam Message",
-   PlaceholderText = "Enter message",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-       chatSpamMessage = Text
-   end,
-})
-
-local ChatSpamDelaySlider = MiscTab:CreateSlider({
-   Name = "Spam Delay",
-   Range = {0.1, 5},
-   Increment = 0.1,
-   Suffix = "Seconds",
-   CurrentValue = 1,
-   Flag = "spamdelay",
-   Callback = function(Value)
-       chatSpamDelay = Value
-   end,
-})
-
-local PlayerInfoDropdown = MiscTab:CreateDropdown({
-   Name = "Player Info",
-   Options = getPlayerNames(),
-   CurrentOption = {""},
-   MultipleOptions = false,
-   Flag = "playerinfo",
-   Callback = function(Option)
-       local player = Players:FindFirstChild(Option[1])
-       if player then
-           local info = "Name: " .. player.Name .. "\nUserId: " .. player.UserId .. "\nTeam: " .. (player.Team and player.Team.Name or "None") .. "\nHealth: " .. (player.Character and player.Character.Humanoid.Health or "N/A")
-           PRISM:Notify({
-               Title = "Player Info",
-               Content = info,
-               Duration = 10,
-               Image = 13047715178
-           })
-       end
-   end
-})
-
-local UnlockAllButton = MiscTab:CreateButton({
-   Name = "Unlock All (Attempt)",
-   Callback = function()
-       for _, v in pairs(workspace:GetDescendants()) do
-           if v:IsA("BoolValue") and v.Name:lower():match("locked") then
-               v.Value = false
-           end
-       end
-       PRISM:Notify({
-           Title = "Unlock All",
-           Content = "Attempted to unlock all locked items/doors.",
+       myNotify({
+           Title = "FPS Unlocker",
+           Content = "FPS Unlocker " .. (Value and "enabled!" or "disabled!"),
            Duration = 3,
            Image = 13047715178
        })
    end,
-})
