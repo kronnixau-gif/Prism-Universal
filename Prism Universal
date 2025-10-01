@@ -6,6 +6,9 @@ local Camera = game.Workspace.CurrentCamera
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local Debris = game:GetService("Debris")
 
 local Window = PRISM:CreateWindow({
    Name = "🔥 Prism | Universal 🔫",
@@ -72,8 +75,10 @@ local function startFly()
         humanoid.WalkSpeed = 0
     end
 
-    -- Lift player slightly
-    humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 5, 0)
+    -- Lift player slightly with tween for smoothness
+    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(humanoidRootPart, tweenInfo, {CFrame = humanoidRootPart.CFrame + Vector3.new(0, 5, 0)})
+    tween:Play()
 
     -- Create BodyGyro for rotation
     bodyGyro = Instance.new("BodyGyro")
@@ -110,13 +115,13 @@ local function startFly()
         if input.KeyCode == Enum.KeyCode.LeftShift then keys.Down = 0 end
     end)
 
-    flyConnections.render = RunService.RenderStepped:Connect(function()
+    flyConnections.render = RunService.RenderStepped:Connect(function(delta)
         if _G.flyEnabled and bodyGyro and bodyVelocity then
             bodyGyro.CFrame = Camera.CFrame
             local moveDirection = Vector3.new(keys.Left + keys.Right, keys.Up + keys.Down, keys.Backward + keys.Forward)
-            local velocity = (Camera.CFrame * moveDirection).Unit * flySpeed
             if moveDirection.Magnitude > 0 then
-                bodyVelocity.Velocity = velocity
+                local velocity = (Camera.CFrame * CFrame.new(moveDirection)).Position - humanoidRootPart.Position
+                bodyVelocity.Velocity = velocity.Unit * flySpeed
             else
                 bodyVelocity.Velocity = Vector3.new(0, 0, 0)
             end
@@ -173,16 +178,25 @@ end
 _G.noclipEnabled = false
 local noclipConnection
 
-local function startNoclip()
-    _G.noclipEnabled = true
+local function setCollision(state)
     local character = Players.LocalPlayer.Character
     if not character then return end
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = state
+        end
+    end
+end
+
+local function startNoclip()
+    _G.noclipEnabled = true
+    setCollision(false)
     noclipConnection = RunService.Stepped:Connect(function()
         if _G.noclipEnabled then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
+            -- Minimal check, no full loop every frame
+            local character = Players.LocalPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0) -- Prevent falling if needed
             end
         end
     end)
@@ -200,14 +214,7 @@ local function stopNoclip()
         noclipConnection:Disconnect()
         noclipConnection = nil
     end
-    local character = Players.LocalPlayer.Character
-    if character then
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
-    end
+    setCollision(true)
     PRISM:Notify({
         Title = "Noclip",
         Content = "Noclip disabled!",
@@ -245,17 +252,18 @@ local interactableParts = {}
 local interactConnection
 
 local function isInteractable(part)
-    return part:IsA("BasePart") and (part:FindFirstChild("ClickDetector") or part.Name:lower():match("door") or part.Name:lower():match("button"))
+    return part:IsA("BasePart") and (part:FindFirstChild("ClickDetector") or part:FindFirstChild("ProximityPrompt") or part.Name:lower():match("door") or part.Name:lower():match("button"))
 end
 
 local function highlightInteractable(part)
     if not interactableParts[part] then
-        local highlight = Instance.new("SelectionBox")
+        local highlight = Instance.new("Highlight")
         highlight.Name = "InteractHighlight"
         highlight.Adornee = part
-        highlight.Color3 = interactHighlightColor
-        highlight.LineThickness = 0.05
-        highlight.SurfaceTransparency = 0.5
+        highlight.FillColor = interactHighlightColor
+        highlight.OutlineColor = interactHighlightColor
+        highlight.FillTransparency = 0.7
+        highlight.OutlineTransparency = 0
         highlight.Parent = part
         interactableParts[part] = highlight
     end
@@ -273,21 +281,29 @@ local function triggerInteraction()
     local character = player.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     local root = character.HumanoidRootPart
-    for _, part in pairs(game.Workspace:GetDescendants()) do
-        if isInteractable(part) and (part.Position - root.Position).Magnitude <= interactDistance then
-            if part:FindFirstChild("ClickDetector") then
-                fireclickdetector(part.ClickDetector)
-            elseif part:IsA("BasePart") then
-                pcall(function() part:Activate() end) -- For proximity prompts
-            end
-            PRISM:Notify({
-                Title = "Interaction",
-                Content = "Interacted with " .. part.Name,
-                Duration = 3,
-                Image = 13047715178
-            })
-            break
+    local closestPart = nil
+    local closestDist = interactDistance
+    for part, _ in pairs(interactableParts) do
+        local dist = (part.Position - root.Position).Magnitude
+        if dist <= closestDist then
+            closestDist = dist
+            closestPart = part
         end
+    end
+    if closestPart then
+        if closestPart:FindFirstChild("ClickDetector") then
+            fireclickdetector(closestPart.ClickDetector)
+        elseif closestPart:FindFirstChild("ProximityPrompt") then
+            fireproximityprompt(closestPart.ProximityPrompt)
+        elseif closestPart:IsA("BasePart") then
+            pcall(function() closestPart:Activate() end)
+        end
+        PRISM:Notify({
+            Title = "Interaction",
+            Content = "Interacted with " .. closestPart.Name,
+            Duration = 3,
+            Image = 13047715178
+        })
     end
 end
 
@@ -296,13 +312,19 @@ local function updateInteractables()
     local character = player.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     local root = character.HumanoidRootPart
-    for _, part in pairs(game.Workspace:GetDescendants()) do
+    local region = Region3.new(root.Position - Vector3.new(interactDistance, interactDistance, interactDistance), root.Position + Vector3.new(interactDistance, interactDistance, interactDistance))
+    local parts = workspace:FindPartsInRegion3(region, character, 100) -- Limit to 100 parts for performance
+    for _, part in pairs(parts) do
         if isInteractable(part) then
-            if (part.Position - root.Position).Magnitude <= interactDistance then
-                highlightInteractable(part)
-            else
-                removeHighlight(part)
-            end
+            highlightInteractable(part)
+        else
+            removeHighlight(part)
+        end
+    end
+    -- Clean up old highlights not in range
+    for part, _ in pairs(interactableParts) do
+        if (part.Position - root.Position).Magnitude > interactDistance then
+            removeHighlight(part)
         end
     end
 end
@@ -312,21 +334,18 @@ local function killAll()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= Players.LocalPlayer and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
             local humanoid = player.Character.Humanoid
-            -- Method 1: Set health to 0
             pcall(function() humanoid.Health = 0 end)
-            -- Method 2: Apply high force
             if player.Character:FindFirstChild("HumanoidRootPart") then
                 local bv = Instance.new("BodyVelocity")
                 bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
                 bv.Velocity = Vector3.new(0, -1000, 0)
                 bv.Parent = player.Character.HumanoidRootPart
-                game.Debris:AddItem(bv, 0.1)
+                Debris:AddItem(bv, 0.1)
             end
-            -- Method 3: Fire damage remotes
             for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
                 if remote:IsA("RemoteEvent") and (remote.Name:lower():match("damage") or remote.Name:lower():match("hit")) then
                     pcall(function()
-                        remote:FireServer(player.Character.Humanoid, 1000)
+                        remote:FireServer(player.Character.Humanoid, math.huge)
                     end)
                 end
             end
@@ -449,7 +468,7 @@ local AntiAimToggle = MovementTab:CreateToggle({
    Callback = function(Value)
        _G.antiAimEnabled = Value
        if Value then
-           RunService:BindToRenderStep("AntiAim", 1, function()
+           RunService:BindToRenderStep("AntiAim", Enum.RenderPriority.Camera.Value + 1, function()
                local character = Players.LocalPlayer.Character
                if character and character:FindFirstChild("HumanoidRootPart") then
                    character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(math.random(-180, 180)), 0)
@@ -468,17 +487,84 @@ local BunnyHopToggle = MovementTab:CreateToggle({
    Callback = function(Value)
        _G.bunnyHopEnabled = Value
        if Value then
-           RunService:BindToRenderStep("BunnyHop", 1, function()
+           RunService:BindToRenderStep("BunnyHop", Enum.RenderPriority.Input.Value, function()
                local character = Players.LocalPlayer.Character
                if character and character:FindFirstChildOfClass("Humanoid") then
                    local humanoid = character.Humanoid
-                   if humanoid:GetState() == Enum.HumanoidStateType.Running and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                   if humanoid:GetState() == Enum.HumanoidStateType.Freefall and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                    end
                end
            end)
        else
            RunService:UnbindFromRenderStep("BunnyHop")
+       end
+   end,
+})
+
+local InfiniteJumpToggle = MovementTab:CreateToggle({
+   Name = "Infinite Jump",
+   CurrentValue = false,
+   Flag = "infinitejump",
+   Callback = function(Value)
+       _G.infiniteJumpEnabled = Value
+       if Value then
+           UserInputService.JumpRequest:Connect(function()
+               if _G.infiniteJumpEnabled then
+                   local humanoid = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                   if humanoid then
+                       humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                   end
+               end
+           end)
+       end
+   end,
+})
+
+local AirWalkToggle = MovementTab:CreateToggle({
+   Name = "Air Walk",
+   CurrentValue = false,
+   Flag = "airwalk",
+   Callback = function(Value)
+       _G.airWalkEnabled = Value
+       local platform = Instance.new("Part")
+       platform.Size = Vector3.new(5, 1, 5)
+       platform.Transparency = 1
+       platform.Anchored = true
+       platform.Parent = workspace
+       if Value then
+           RunService:BindToRenderStep("AirWalk", Enum.RenderPriority.Character.Value, function()
+               local character = Players.LocalPlayer.Character
+               if character and character:FindFirstChild("HumanoidRootPart") then
+                   platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3, 0)
+               end
+           end)
+       else
+           RunService:UnbindFromRenderStep("AirWalk")
+           platform:Destroy()
+       end
+   end,
+})
+
+local SpiderClimbToggle = MovementTab:CreateToggle({
+   Name = "Spider Climb",
+   CurrentValue = false,
+   Flag = "spiderclimb",
+   Callback = function(Value)
+       _G.spiderClimbEnabled = Value
+       if Value then
+           RunService:BindToRenderStep("SpiderClimb", Enum.RenderPriority.Input.Value, function()
+               local character = Players.LocalPlayer.Character
+               if character and character:FindFirstChild("HumanoidRootPart") and UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                   local ray = Ray.new(character.HumanoidRootPart.Position, character.HumanoidRootPart.CFrame.LookVector * 2)
+                   local hit, pos, normal = workspace:FindPartOnRay(ray, character)
+                   if hit then
+                       character.HumanoidRootPart.Velocity = normal * 50
+                   end
+               end
+           end)
+       else
+           RunService:UnbindFromRenderStep("SpiderClimb")
        end
    end,
 })
@@ -502,7 +588,9 @@ local TeleportDropdown = MovementTab:CreateDropdown({
    Callback = function(Option)
        local targetPlayer = Players:FindFirstChild(Option[1])
        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-           Players.LocalPlayer.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame
+           local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
+           local tween = TweenService:Create(Players.LocalPlayer.Character.HumanoidRootPart, tweenInfo, {CFrame = targetPlayer.Character.HumanoidRootPart.CFrame})
+           tween:Play()
            PRISM:Notify({
                Title = "Teleport",
                Content = "Teleported to " .. targetPlayer.Name,
@@ -532,14 +620,19 @@ local espFeatures = {
     tracers = false,
     teamFilter = false,
     textOutline = true,
-    useTeamColors = false
+    useTeamColors = false,
+    skeleton = false,
+    item = false
 }
 local espColors = {
     box = Color3.fromRGB(255, 255, 255),
     text = Color3.fromRGB(255, 255, 255),
-    tracer = Color3.fromRGB(255, 255, 255)
+    tracer = Color3.fromRGB(255, 255, 255),
+    skeleton = Color3.fromRGB(255, 255, 255),
+    item = Color3.fromRGB(0, 255, 0)
 }
 local playerESP = {}
+local itemESP = {}
 
 local function shouldShowESP(player)
     if player == Players.LocalPlayer then return false end
@@ -624,60 +717,129 @@ local function updateTracer(player)
         local tracer = playerESP[player].tracer
         local targetPos = player.Character.HumanoidRootPart.Position
         local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
-        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        local mouse = UserInputService:GetMouseLocation()
-        local isFirstPerson = (Camera.CFrame.Position - Players.LocalPlayer.Character.Head.Position).Magnitude < 1
-        local startPos = isFirstPerson and center or mouse
-        local z = screenPos.Z
-
-        if z < 0 then
-            screenPos = Camera:WorldToViewportPoint(targetPos + Camera.CFrame.LookVector * -1000)
-            screenPos = Vector3.new(center.X * 2 - screenPos.X, center.Y * 2 - screenPos.Y, screenPos.Z)
-        end
-
-        local projected = Vector2.new(screenPos.X, screenPos.Y)
-        if not onScreen then
-            local direction = (projected - center).Unit
-            local halfWidth = Camera.ViewportSize.X / 2
-            local halfHeight = Camera.ViewportSize.Y / 2
-            local tX = math.abs(halfWidth / direction.X)
-            local tY = math.abs(halfHeight / direction.Y)
-            local t = math.min(tX, tY)
-            projected = center + direction * t
-        end
-
-        tracer.From = startPos
-        tracer.To = projected
+        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+        tracer.From = center
+        tracer.To = Vector2.new(screenPos.X, screenPos.Y)
         tracer.Color = getESPColor(player) or espColors.tracer
-        tracer.Visible = true
-    else
-        if playerESP[player] and playerESP[player].tracer then
-            playerESP[player].tracer.Visible = false
+        tracer.Visible = onScreen
+    end
+end
+
+local function createSkeleton(player)
+    if not shouldShowESP(player) or not player.Character then return end
+    local skeletonLines = {}
+    local parts = {"Head", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm", "LeftHand", "RightHand", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot"}
+    for _, partName in pairs(parts) do
+        if player.Character:FindFirstChild(partName) then
+            local line = Drawing.new("Line")
+            line.Visible = false
+            line.Color = getESPColor(player) or espColors.skeleton
+            line.Thickness = 1
+            line.Transparency = 1
+            skeletonLines[partName] = line
+        end
+    end
+    if not playerESP[player] then playerESP[player] = {} end
+    playerESP[player].skeleton = skeletonLines
+end
+
+local function updateSkeleton(player)
+    if playerESP[player] and playerESP[player].skeleton and player.Character then
+        local connections = {
+            Head = "UpperTorso",
+            UpperTorso = "LowerTorso",
+            UpperTorso = "LeftUpperArm",
+            UpperTorso = "RightUpperArm",
+            LeftUpperArm = "LeftLowerArm",
+            RightUpperArm = "RightLowerArm",
+            LeftLowerArm = "LeftHand",
+            RightLowerArm = "RightHand",
+            LowerTorso = "LeftUpperLeg",
+            LowerTorso = "RightUpperLeg",
+            LeftUpperLeg = "LeftLowerLeg",
+            RightUpperLeg = "RightLowerLeg",
+            LeftLowerLeg = "LeftFoot",
+            RightLowerLeg = "RightFoot"
+        }
+        for fromPart, toPart in pairs(connections) do
+            if player.Character:FindFirstChild(fromPart) and player.Character:FindFirstChild(toPart) then
+                local fromPos = Camera:WorldToViewportPoint(player.Character[fromPart].Position)
+                local toPos = Camera:WorldToViewportPoint(player.Character[toPart].Position)
+                local line = playerESP[player].skeleton[fromPart] or playerESP[player].skeleton[toPart]
+                if line then
+                    line.From = Vector2.new(fromPos.X, fromPos.Y)
+                    line.To = Vector2.new(toPos.X, toPos.Y)
+                    line.Visible = fromPos.Z > 0 and toPos.Z > 0
+                end
+            end
         end
     end
 end
 
-local function removeESPFeature(player, feature)
-    if playerESP[player] and playerESP[player][feature] then
-        if playerESP[player][feature].Destroy then
-            playerESP[player][feature]:Destroy()
-        end
-        playerESP[player][feature] = nil
+local function createItemESP(item)
+    if not item:IsA("BasePart") or itemESP[item] then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ItemESP"
+    highlight.Adornee = item
+    highlight.FillColor = espColors.item
+    highlight.OutlineColor = espColors.item
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = item
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ItemText"
+    billboard.Adornee = item
+    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = espColors.text
+    text.TextSize = 12
+    text.Text = item.Name
+    text.Parent = billboard
+    billboard.Parent = item
+    itemESP[item] = {highlight = highlight, billboard = billboard}
+end
+
+local function removeItemESP(item)
+    if itemESP[item] then
+        itemESP[item].highlight:Destroy()
+        itemESP[item].billboard:Destroy()
+        itemESP[item] = nil
     end
 end
 
 local function toggleESPFeature(feature)
     espFeatures[feature] = not espFeatures[feature]
     if espFeatures[feature] then
-        for _, player in pairs(Players:GetPlayers()) do
-            if shouldShowESP(player) then
-                if feature == "box" then createBox(player) end
-                if feature == "tracers" then createTracer(player) end
-                if feature == "name" or feature == "distance" or feature == "health" then
-                    if not playerESP[player] or not playerESP[player].text then
-                        createTextESP(player)
+        if feature == "item" then
+            for _, item in pairs(workspace:GetDescendants()) do
+                if item:IsA("BasePart") and item.Name:lower():match("item") or item.Name:lower():match("tool") then
+                    createItemESP(item)
+                end
+            end
+            workspace.DescendantAdded:Connect(function(item)
+                if espFeatures.item and item:IsA("BasePart") and item.Name:lower():match("item") or item.Name:lower():match("tool") then
+                    createItemESP(item)
+                end
+            end)
+            workspace.DescendantRemoving:Connect(function(item)
+                removeItemESP(item)
+            end)
+        else
+            for _, player in pairs(Players:GetPlayers()) do
+                if shouldShowESP(player) then
+                    if feature == "box" then createBox(player) end
+                    if feature == "tracers" then createTracer(player) end
+                    if feature == "skeleton" then createSkeleton(player) end
+                    if feature == "name" or feature == "distance" or feature == "health" then
+                        if not playerESP[player] or not playerESP[player].text then
+                            createTextESP(player)
+                        end
+                        updateTextESP(player)
                     end
-                    updateTextESP(player)
                 end
             end
         end
@@ -688,13 +850,27 @@ local function toggleESPFeature(feature)
             Image = 13047715178
         })
     else
-        for _, player in pairs(Players:GetPlayers()) do
-            if feature == "box" then removeESPFeature(player, "box") end
-            if feature == "tracers" then removeESPFeature(player, "tracer") end
-            if feature == "name" or feature == "distance" or feature == "health" then
-                updateTextESP(player)
-                if not espFeatures.name and not espFeatures.distance and not espFeatures.health then
-                    removeESPFeature(player, "text")
+        if feature == "item" then
+            for item, _ in pairs(itemESP) do
+                removeItemESP(item)
+            end
+        else
+            for _, player in pairs(Players:GetPlayers()) do
+                if feature == "box" then removeESPFeature(player, "box") end
+                if feature == "tracers" then removeESPFeature(player, "tracer") end
+                if feature == "skeleton" then
+                    if playerESP[player] and playerESP[player].skeleton then
+                        for _, line in pairs(playerESP[player].skeleton) do
+                            line:Remove()
+                        end
+                        playerESP[player].skeleton = nil
+                    end
+                end
+                if feature == "name" or feature == "distance" or feature == "health" then
+                    updateTextESP(player)
+                    if not espFeatures.name and not espFeatures.distance and not espFeatures.health then
+                        removeESPFeature(player, "text")
+                    end
                 end
             end
         end
@@ -704,6 +880,17 @@ local function toggleESPFeature(feature)
             Duration = 3,
             Image = 13047715178
         })
+    end
+end
+
+local function removeESPFeature(player, feature)
+    if playerESP[player] and playerESP[player][feature] then
+        if playerESP[player][feature].Destroy then
+            playerESP[player][feature]:Destroy()
+        elseif playerESP[player][feature].Remove then
+            playerESP[player][feature]:Remove()
+        end
+        playerESP[player][feature] = nil
     end
 end
 
@@ -719,6 +906,7 @@ RunService.RenderStepped:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
         if espFeatures.distance or espFeatures.health or espFeatures.name then updateTextESP(player) end
         if espFeatures.tracers then updateTracer(player) end
+        if espFeatures.skeleton then updateSkeleton(player) end
     end
     updateInteractables()
 end)
@@ -728,6 +916,7 @@ Players.PlayerAdded:Connect(function(player)
         if shouldShowESP(player) then
             if espFeatures.box then createBox(player) end
             if espFeatures.tracers then createTracer(player) end
+            if espFeatures.skeleton then createSkeleton(player) end
             if espFeatures.name or espFeatures.distance or espFeatures.health then 
                 createTextESP(player)
                 updateTextESP(player)
@@ -741,6 +930,7 @@ Players.PlayerAdded:Connect(function(player)
         if shouldShowESP(player) then
             if espFeatures.box then createBox(player) end
             if espFeatures.tracers then createTracer(player) end
+            if espFeatures.skeleton then createSkeleton(player) end
             if espFeatures.name or espFeatures.distance or espFeatures.health then 
                 createTextESP(player)
                 updateTextESP(player)
@@ -856,6 +1046,53 @@ local TracerColorPicker = VisualsTab:CreateColorPicker({
    end
 })
 
+local SkeletonToggle = VisualsTab:CreateToggle({
+   Name = "Skeleton ESP",
+   CurrentValue = false,
+   Flag = "skeletonesp",
+   Callback = function(Value)
+       toggleESPFeature("skeleton")
+   end,
+})
+
+local SkeletonColorPicker = VisualsTab:CreateColorPicker({
+   Name = "Skeleton Color",
+   Color = Color3.fromRGB(255, 255, 255),
+   Flag = "skeletoncolor",
+   Callback = function(Color)
+       espColors.skeleton = Color
+       for player, esp in pairs(playerESP) do
+           if esp.skeleton then
+               for _, line in pairs(esp.skeleton) do
+                   line.Color = getESPColor(player) or Color
+               end
+           end
+       end
+   end
+})
+
+local ItemESPToggle = VisualsTab:CreateToggle({
+   Name = "Item ESP",
+   CurrentValue = false,
+   Flag = "itemesp",
+   Callback = function(Value)
+       toggleESPFeature("item")
+   end,
+})
+
+local ItemColorPicker = VisualsTab:CreateColorPicker({
+   Name = "Item Color",
+   Color = Color3.fromRGB(0, 255, 0),
+   Flag = "itemcolor",
+   Callback = function(Color)
+       espColors.item = Color
+       for _, data in pairs(itemESP) do
+           data.highlight.FillColor = Color
+           data.highlight.OutlineColor = Color
+       end
+   end
+})
+
 local TeamFilterToggle = VisualsTab:CreateToggle({
    Name = "Team Filter",
    CurrentValue = false,
@@ -869,6 +1106,7 @@ local TeamFilterToggle = VisualsTab:CreateToggle({
            if shouldShowESP(player) then
                if espFeatures.box then createBox(player) end
                if espFeatures.tracers then createTracer(player) end
+               if espFeatures.skeleton then createSkeleton(player) end
                if espFeatures.name or espFeatures.distance or espFeatures.health then 
                    createTextESP(player)
                    updateTextESP(player)
@@ -894,6 +1132,11 @@ local UseTeamColorsToggle = VisualsTab:CreateToggle({
                end
                if playerESP[player].tracer then
                    playerESP[player].tracer.Color = getESPColor(player) or espColors.tracer
+               end
+               if playerESP[player].skeleton then
+                   for _, line in pairs(playerESP[player].skeleton) do
+                       line.Color = getESPColor(player) or espColors.skeleton
+                   end
                end
            end
        end
@@ -958,7 +1201,7 @@ local CrosshairToggle = VisualsTab:CreateToggle({
        crosshair.Filled = true
        crosshair.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
        if Value then
-           RunService:BindToRenderStep("Crosshair", 1, function()
+           RunService:BindToRenderStep("Crosshair", Enum.RenderPriority.Camera.Value, function()
                crosshair.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
            end)
        else
@@ -977,6 +1220,19 @@ local FOVChangerSlider = VisualsTab:CreateSlider({
    Flag = "fovchanger",
    Callback = function(Value)
        Camera.FieldOfView = Value
+   end,
+})
+
+local XRayToggle = VisualsTab:CreateToggle({
+   Name = "X-Ray (Transparent Walls)",
+   CurrentValue = false,
+   Flag = "xray",
+   Callback = function(Value)
+       for _, part in pairs(workspace:GetDescendants()) do
+           if part:IsA("BasePart") and not part.Parent:FindFirstChildOfClass("Humanoid") then
+               part.Transparency = Value and 0.5 or 0
+           end
+       end
    end,
 })
 
@@ -1025,9 +1281,9 @@ local function getClosestPlayerInFOV()
         if player ~= localPlayer and (not aimbotTeamFilter or player.Team ~= localPlayer.Team) and player.Character and player.Character:FindFirstChild(aimbotTargetPart) and player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid.Health > 0 then
             local targetPos = player.Character[aimbotTargetPart].Position
             local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
-            if onScreen or not aimbotVisibleCheck then
+            if onScreen then
                 local distance = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                if distance < closestDistance then
+                if distance < closestDistance and (not aimbotVisibleCheck or onScreen) then
                     closestDistance = distance
                     closestPlayer = player
                 end
@@ -1041,7 +1297,7 @@ end
 local function toggleAimbot(value)
     aimbotEnabled = value
     if aimbotEnabled then
-        aimbotConnection = RunService.Stepped:Connect(function()
+        aimbotConnection = RunService.RenderStepped:Connect(function()
             if UserInputService:IsMouseButtonPressed(aimbotKey) then
                 local target = getClosestPlayerInFOV()
                 if target and target.Character and target.Character:FindFirstChild(aimbotTargetPart) then
@@ -1141,6 +1397,38 @@ local function toggleSilentAim(value)
     end
 end
 
+local hitboxExpanderEnabled = false
+local hitboxSize = 5
+local hitboxTransparency = 0.5
+
+local function toggleHitboxExpander(value)
+    hitboxExpanderEnabled = value
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local root = player.Character.HumanoidRootPart
+            root.Size = value and Vector3.new(hitboxSize, hitboxSize, hitboxSize) or Vector3.new(2, 2, 1)
+            root.Transparency = value and hitboxTransparency or 0
+            root.CanCollide = false
+        end
+    end
+end
+
+local rapidFireEnabled = false
+
+local function toggleRapidFire(value)
+    rapidFireEnabled = value
+    if value then
+        RunService:BindToRenderStep("RapidFire", Enum.RenderPriority.Input.Value, function()
+            local tool = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                tool:Activate()
+            end
+        end)
+    else
+        RunService:UnbindFromRenderStep("RapidFire")
+    end
+end
+
 -- Combat Toggles and Options
 local AimbotToggle = CombatTab:CreateToggle({
    Name = "Enable Aimbot",
@@ -1153,7 +1441,7 @@ local AimbotToggle = CombatTab:CreateToggle({
 
 local TargetPartDropdown = CombatTab:CreateDropdown({
    Name = "Target Part",
-   Options = {"Head", "HumanoidRootPart"},
+   Options = {"Head", "HumanoidRootPart", "Torso"},
    CurrentOption = {"Head"},
    MultipleOptions = false,
    Flag = "targetpart",
@@ -1249,6 +1537,54 @@ local SilentAimToggle = CombatTab:CreateToggle({
    end,
 })
 
+local HitboxExpanderToggle = CombatTab:CreateToggle({
+   Name = "Hitbox Expander",
+   CurrentValue = false,
+   Flag = "hitboxexpander",
+   Callback = function(Value)
+       toggleHitboxExpander(Value)
+   end,
+})
+
+local HitboxSizeSlider = CombatTab:CreateSlider({
+   Name = "Hitbox Size",
+   Range = {1, 20},
+   Increment = 1,
+   Suffix = "Size",
+   CurrentValue = 5,
+   Flag = "hitboxsize",
+   Callback = function(Value)
+       hitboxSize = Value
+       if hitboxExpanderEnabled then
+           toggleHitboxExpander(true)
+       end
+   end,
+})
+
+local HitboxTransparencySlider = CombatTab:CreateSlider({
+   Name = "Hitbox Transparency",
+   Range = {0, 1},
+   Increment = 0.1,
+   Suffix = "Transparency",
+   CurrentValue = 0.5,
+   Flag = "hitboxtrans",
+   Callback = function(Value)
+       hitboxTransparency = Value
+       if hitboxExpanderEnabled then
+           toggleHitboxExpander(true)
+       end
+   end,
+})
+
+local RapidFireToggle = CombatTab:CreateToggle({
+   Name = "Rapid Fire",
+   CurrentValue = false,
+   Flag = "rapidfire",
+   Callback = function(Value)
+       toggleRapidFire(Value)
+   end,
+})
+
 local KillAllButton = CombatTab:CreateButton({
    Name = "Kill All",
    Callback = function()
@@ -1264,11 +1600,12 @@ local infiniteAmmoEnabled = false
 local noRecoilEnabled = false
 local noSpreadEnabled = false
 local godModeEnabled = false
+local antiAFKEnabled = false
 
 local function toggleInfiniteAmmo(value)
     infiniteAmmoEnabled = value
     if value then
-        RunService:BindToRenderStep("InfiniteAmmo", 1, function()
+        RunService:BindToRenderStep("InfiniteAmmo", Enum.RenderPriority.Character.Value, function()
             local tool = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Tool")
             if tool then
                 for _, v in pairs(tool:GetDescendants()) do
@@ -1286,7 +1623,7 @@ end
 local function toggleNoRecoil(value)
     noRecoilEnabled = value
     if value then
-        RunService:BindToRenderStep("NoRecoil", 1, function()
+        RunService:BindToRenderStep("NoRecoil", Enum.RenderPriority.Camera.Value, function()
             local tool = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Tool")
             if tool then
                 for _, v in pairs(tool:GetDescendants()) do
@@ -1304,7 +1641,7 @@ end
 local function toggleNoSpread(value)
     noSpreadEnabled = value
     if value then
-        RunService:BindToRenderStep("NoSpread", 1, function()
+        RunService:BindToRenderStep("NoSpread", Enum.RenderPriority.Character.Value, function()
             local tool = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Tool")
             if tool then
                 for _, v in pairs(tool:GetDescendants()) do
@@ -1322,7 +1659,7 @@ end
 local function toggleGodMode(value)
     godModeEnabled = value
     if value then
-        RunService:BindToRenderStep("GodMode", 1, function()
+        RunService:BindToRenderStep("GodMode", Enum.RenderPriority.Character.Value, function()
             local humanoid = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if humanoid then
                 humanoid.Health = humanoid.MaxHealth
@@ -1333,9 +1670,21 @@ local function toggleGodMode(value)
     end
 end
 
+local function toggleAntiAFK(value)
+    antiAFKEnabled = value
+    if value then
+        Players.LocalPlayer.Idled:Connect(function()
+            if antiAFKEnabled then
+                game:GetService("VirtualUser"):CaptureController()
+                game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+            end
+        end)
+    end
+end
+
 local function giveItem(itemName)
     for _, v in pairs(ReplicatedStorage:GetDescendants()) do
-        if v:IsA("RemoteEvent") and v.Name:lower():match("give") then
+        if v:IsA("RemoteEvent") and v.Name:lower():match("give") or v.Name:lower():match("equip") then
             pcall(function()
                 v:FireServer(itemName)
             end)
@@ -1350,15 +1699,19 @@ local function giveItem(itemName)
 end
 
 local function serverCrash()
+    local crashTable = {}
+    for i = 1, 1000 do
+        table.insert(crashTable, string.rep("crash", 1000))
+    end
     while true do
         for _, v in pairs(ReplicatedStorage:GetDescendants()) do
             if v:IsA("RemoteEvent") then
                 pcall(function()
-                    v:FireServer(table.concat({string.rep("crash", 1000)}, ""))
+                    v:FireServer(crashTable)
                 end)
             end
         end
-        wait()
+        task.wait(0.1) -- Slight delay to reduce lag
     end
 end
 
@@ -1398,6 +1751,15 @@ local GodModeToggle = ExploitsTab:CreateToggle({
    end,
 })
 
+local AntiAFKToggle = ExploitsTab:CreateToggle({
+   Name = "Anti-AFK",
+   CurrentValue = false,
+   Flag = "antiafk",
+   Callback = function(Value)
+       toggleAntiAFK(Value)
+   end,
+})
+
 local GiveItemInput = ExploitsTab:CreateInput({
    Name = "Give Item",
    PlaceholderText = "Enter item name",
@@ -1417,6 +1779,15 @@ local ServerCrashButton = ExploitsTab:CreateButton({
            Image = 13047715178
        })
        spawn(serverCrash)
+   end,
+})
+
+local ServerHopButton = ExploitsTab:CreateButton({
+   Name = "Server Hop",
+   Callback = function()
+       local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+       local serverId = servers.data[math.random(1, #servers.data)].id
+       TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId)
    end,
 })
 
@@ -1469,8 +1840,9 @@ local InteractHighlightColorPicker = SettingsTab:CreateColorPicker({
    Flag = "interacthighlightcolor",
    Callback = function(Color)
        interactHighlightColor = Color
-       for part, highlight in pairs(interactableParts) do
-           highlight.Color3 = Color
+       for _, highlight in pairs(interactableParts) do
+           highlight.FillColor = Color
+           highlight.OutlineColor = Color
        end
    end
 })
@@ -1496,7 +1868,7 @@ local AutoRejoinToggle = SettingsTab:CreateToggle({
        if Value then
            game:GetService("CoreGui").RobloxPromptGui.promptOverlay.ChildAdded:Connect(function(child)
                if child.Name == "ErrorPrompt" then
-                   game:GetService("TeleportService"):Teleport(game.PlaceId)
+                   TeleportService:Teleport(game.PlaceId)
                end
            end)
        end
@@ -1505,3 +1877,90 @@ local AutoRejoinToggle = SettingsTab:CreateToggle({
 
 -- Config Label
 local ConfigLabelSettings = SettingsTab:CreateLabel("Configurations are automatically saved and loaded from PrismHub/Config.json")
+
+-- Misc Tab
+local MiscTab = Window:CreateTab("📦 Misc", nil)
+local MiscSection = MiscTab:CreateSection("Options")
+
+local chatSpamEnabled = false
+local chatSpamMessage = "Prism Universal owns you!"
+local chatSpamDelay = 1
+
+local function toggleChatSpam(value)
+    chatSpamEnabled = value
+    if value then
+        spawn(function()
+            while chatSpamEnabled do
+                ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(chatSpamMessage, "All")
+                wait(chatSpamDelay)
+            end
+        end)
+    end
+end
+
+local ChatSpamToggle = MiscTab:CreateToggle({
+   Name = "Chat Spam",
+   CurrentValue = false,
+   Flag = "chatspam",
+   Callback = function(Value)
+       toggleChatSpam(Value)
+   end,
+})
+
+local ChatSpamInput = MiscTab:CreateInput({
+   Name = "Spam Message",
+   PlaceholderText = "Enter message",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+       chatSpamMessage = Text
+   end,
+})
+
+local ChatSpamDelaySlider = MiscTab:CreateSlider({
+   Name = "Spam Delay",
+   Range = {0.1, 5},
+   Increment = 0.1,
+   Suffix = "Seconds",
+   CurrentValue = 1,
+   Flag = "spamdelay",
+   Callback = function(Value)
+       chatSpamDelay = Value
+   end,
+})
+
+local PlayerInfoDropdown = MiscTab:CreateDropdown({
+   Name = "Player Info",
+   Options = getPlayerNames(),
+   CurrentOption = {""},
+   MultipleOptions = false,
+   Flag = "playerinfo",
+   Callback = function(Option)
+       local player = Players:FindFirstChild(Option[1])
+       if player then
+           local info = "Name: " .. player.Name .. "\nUserId: " .. player.UserId .. "\nTeam: " .. (player.Team and player.Team.Name or "None") .. "\nHealth: " .. (player.Character and player.Character.Humanoid.Health or "N/A")
+           PRISM:Notify({
+               Title = "Player Info",
+               Content = info,
+               Duration = 10,
+               Image = 13047715178
+           })
+       end
+   end
+})
+
+local UnlockAllButton = MiscTab:CreateButton({
+   Name = "Unlock All (Attempt)",
+   Callback = function()
+       for _, v in pairs(workspace:GetDescendants()) do
+           if v:IsA("BoolValue") and v.Name:lower():match("locked") then
+               v.Value = false
+           end
+       end
+       PRISM:Notify({
+           Title = "Unlock All",
+           Content = "Attempted to unlock all locked items/doors.",
+           Duration = 3,
+           Image = 13047715178
+       })
+   end,
+})
