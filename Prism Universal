@@ -20,29 +20,29 @@ local function myNotify(options)
 end
 
 local Window = PRISM:CreateWindow({
-   Name = "🔥 Prism | Universal 🔫",
-   LoadingTitle = "🔫 Universal Script 💥",
-   LoadingSubtitle = "By kronnixau",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "PrismHub",
-      FileName = "Config"
-   },
-   Discord = {
-      Enabled = true,
-      Invite = "gcjaDpMYce",
-      RememberJoins = true
-   },
-   KeySystem = false,
-   KeySettings = {
-      Title = "Key | Prism Universal",
-      Subtitle = "UI Keybind",
-      Note = "Key In Discord Server",
-      FileName = "Prism",
-      SaveKey = true,
-      GrabKeyFromSite = true,
-      Key = {"https://pastebin.com/XFfbRsjP"}
-   }
+    Name = "🔥 Prism | Universal 🔫",
+    LoadingTitle = "🔫 Universal Script 💥",
+    LoadingSubtitle = "By kronnixau",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "PrismHub",
+        FileName = "Config"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "gcjaDpMYce",
+        RememberJoins = true
+    },
+    KeySystem = false,
+    KeySettings = {
+        Title = "Key | Prism Universal",
+        Subtitle = "UI Keybind",
+        Note = "Key In Discord Server",
+        FileName = "Prism",
+        SaveKey = true,
+        GrabKeyFromSite = true,
+        Key = {"https://pastebin.com/XFfbRsjP"}
+    }
 })
 
 -- Home Tab
@@ -50,18 +50,18 @@ local HomeTab = Window:CreateTab("🏠 Home", nil)
 local MainSection = HomeTab:CreateSection("Main")
 
 myNotify({
-   Title = "Welcome to Prism Universal",
-   Content = "GUI loaded! Use tabs to access features.",
-   Duration = 5,
-   Image = 13047715178,
-   Actions = {
-      Ignore = {
-         Name = "Okay!",
-         Callback = function()
-            print("The user tapped Okay!")
-         end
-      }
-   }
+    Title = "Welcome to Prism Universal",
+    Content = "GUI loaded! Use tabs to access features.",
+    Duration = 5,
+    Image = 13047715178,
+    Actions = {
+        Ignore = {
+            Name = "Okay!",
+            Callback = function()
+                print("The user tapped Okay!")
+            end
+        }
+    }
 })
 
 local WelcomeLabel = HomeTab:CreateLabel("Welcome to Prism Universal! Use the tabs to access all features.")
@@ -233,28 +233,6 @@ local function stopNoclip()
     })
 end
 
--- Keybinds
-local keybinds = {
-    fly = Enum.KeyCode.F,
-    noclip = Enum.KeyCode.G,
-    interact = Enum.KeyCode.E
-}
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == keybinds.fly then
-        toggleFly()
-    elseif input.KeyCode == keybinds.noclip then
-        if _G.noclipEnabled then
-            stopNoclip()
-        else
-            startNoclip()
-        end
-    elseif input.KeyCode == keybinds.interact then
-        triggerInteraction()
-    end
-end)
-
 -- Instance Interaction
 local interactDistance = 10
 local interactHighlightColor = Color3.fromRGB(255, 255, 0)
@@ -301,13 +279,15 @@ local function triggerInteraction()
         end
     end
     if closestPart then
-        if closestPart:FindFirstChild("ClickDetector") then
-            fireclickdetector(closestPart.ClickDetector)
-        elseif closestPart:FindFirstChild("ProximityPrompt") then
-            fireproximityprompt(closestPart.ProximityPrompt)
-        elseif closestPart:IsA("BasePart") then
-            pcall(function() closestPart:Activate() end)
-        end
+        pcall(function()
+            if closestPart:FindFirstChild("ClickDetector") then
+                fireclickdetector(closestPart.ClickDetector)
+            elseif closestPart:FindFirstChild("ProximityPrompt") then
+                fireproximityprompt(closestPart.ProximityPrompt)
+            elseif closestPart:IsA("BasePart") then
+                closestPart:Activate()
+            end
+        end)
         myNotify({
             Title = "Interaction",
             Content = "Interacted with " .. closestPart.Name,
@@ -337,6 +317,28 @@ local function updateInteractables()
         end
     end
 end
+
+-- Keybinds
+local keybinds = {
+    fly = Enum.KeyCode.F,
+    noclip = Enum.KeyCode.G,
+    interact = Enum.KeyCode.E
+}
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == keybinds.fly then
+        toggleFly()
+    elseif input.KeyCode == keybinds.noclip then
+        if _G.noclipEnabled then
+            stopNoclip()
+        else
+            startNoclip()
+        end
+    elseif input.KeyCode == keybinds.interact then
+        triggerInteraction()
+    end
+end)
 
 -- Kill All
 local function killAll()
@@ -370,32 +372,32 @@ end
 
 -- Home Tab Features
 local FlyQuickToggle = HomeTab:CreateToggle({
-   Name = "Quick Toggle Fly",
-   CurrentValue = false,
-   Flag = "quickfly",
-   Callback = function(Value)
-       toggleFly()
-   end,
+    Name = "Quick Toggle Fly",
+    CurrentValue = false,
+    Flag = "quickfly",
+    Callback = function(Value)
+        toggleFly()
+    end,
 })
 
 local NoclipQuickToggle = HomeTab:CreateToggle({
-   Name = "Quick Toggle Noclip",
-   CurrentValue = false,
-   Flag = "quicknoclip",
-   Callback = function(Value)
-       if Value then
-           startNoclip()
-       else
-           stopNoclip()
-       end
-   end,
+    Name = "Quick Toggle Noclip",
+    CurrentValue = false,
+    Flag = "quicknoclip",
+    Callback = function(Value)
+        if Value then
+            startNoclip()
+        else
+            stopNoclip()
+        end
+    end,
 })
 
 local KillAllQuickButton = HomeTab:CreateButton({
-   Name = "Quick Kill All",
-   Callback = function()
-       killAll()
-   end,
+    Name = "Quick Kill All",
+    Callback = function()
+        killAll()
+    end,
 })
 
 local ConfigLabel = HomeTab:CreateLabel("Configurations are automatically saved and loaded from PrismHub/Config.json")
@@ -405,177 +407,177 @@ local MovementTab = Window:CreateTab("🏃 Movement", nil)
 local MovementSection = MovementTab:CreateSection("Options")
 
 local FlyButton = MovementTab:CreateButton({
-   Name = "Toggle Fly",
-   Callback = function()
-       toggleFly()
-   end,
+    Name = "Toggle Fly",
+    Callback = function()
+        toggleFly()
+    end,
 })
 
 local FlySpeedSlider = MovementTab:CreateSlider({
-   Name = "Fly Speed",
-   Range = {10, 1000},
-   Increment = 10,
-   Suffix = "Speed",
-   CurrentValue = 200,
-   Flag = "flyspeed",
-   Callback = function(Value)
-       flySpeed = Value
-   end,
+    Name = "Fly Speed",
+    Range = {10, 1000},
+    Increment = 10,
+    Suffix = "Speed",
+    CurrentValue = 200,
+    Flag = "flyspeed",
+    Callback = function(Value)
+        flySpeed = Value
+    end,
 })
 
 local NoclipButton = MovementTab:CreateButton({
-   Name = "Toggle Noclip",
-   Callback = function()
-       if _G.noclipEnabled then
-           stopNoclip()
-       else
-           startNoclip()
-       end
-   end,
+    Name = "Toggle Noclip",
+    Callback = function()
+        if _G.noclipEnabled then
+            stopNoclip()
+        else
+            startNoclip()
+        end
+    end,
 })
 
 local SpeedHackSlider = MovementTab:CreateSlider({
-   Name = "Speed Hack",
-   Range = {16, 500},
-   Increment = 1,
-   Suffix = "Speed",
-   CurrentValue = 16,
-   Flag = "speedhack",
-   Callback = function(Value)
-       local character = Players.LocalPlayer.Character
-       if character then
-           local humanoid = character:FindFirstChildOfClass("Humanoid")
-           if humanoid then
-               humanoid.WalkSpeed = Value
-           end
-       end
-   end,
+    Name = "Speed Hack",
+    Range = {16, 500},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "speedhack",
+    Callback = function(Value)
+        local character = Players.LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = Value
+            end
+        end
+    end,
 })
 
 local JumpHackSlider = MovementTab:CreateSlider({
-   Name = "Jump Hack",
-   Range = {50, 500},
-   Increment = 1,
-   Suffix = "Power",
-   CurrentValue = 50,
-   Flag = "jumphack",
-   Callback = function(Value)
-       local character = Players.LocalPlayer.Character
-       if character then
-           local humanoid = character:FindFirstChildOfClass("Humanoid")
-           if humanoid then
-               humanoid.JumpPower = Value
-           end
-       end
-   end,
+    Name = "Jump Hack",
+    Range = {50, 500},
+    Increment = 1,
+    Suffix = "Power",
+    CurrentValue = 50,
+    Flag = "jumphack",
+    Callback = function(Value)
+        local character = Players.LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.JumpPower = Value
+            end
+        end
+    end,
 })
 
 local AntiAimToggle = MovementTab:CreateToggle({
-   Name = "Anti-Aim",
-   CurrentValue = false,
-   Flag = "antiaim",
-   Callback = function(Value)
-       _G.antiAimEnabled = Value
-       if Value then
-           RunService:BindToRenderStep("AntiAim", Enum.RenderPriority.Camera.Value + 1, function()
-               local character = Players.LocalPlayer.Character
-               if character and character:FindFirstChild("HumanoidRootPart") then
-                   character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(math.random(-180, 180)), 0)
-               end
-           end)
-       else
-           RunService:UnbindFromRenderStep("AntiAim")
-       end
-   end,
+    Name = "Anti-Aim",
+    CurrentValue = false,
+    Flag = "antiaim",
+    Callback = function(Value)
+        _G.antiAimEnabled = Value
+        if Value then
+            RunService:BindToRenderStep("AntiAim", Enum.RenderPriority.Camera.Value + 1, function()
+                local character = Players.LocalPlayer.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(math.random(-180, 180)), 0)
+                end
+            end)
+        else
+            RunService:UnbindFromRenderStep("AntiAim")
+        end
+    end,
 })
 
 local BunnyHopToggle = MovementTab:CreateToggle({
-   Name = "Bunny Hop",
-   CurrentValue = false,
-   Flag = "bunnyhop",
-   Callback = function(Value)
-       _G.bunnyHopEnabled = Value
-       if Value then
-           RunService:BindToRenderStep("BunnyHop", Enum.RenderPriority.Input.Value, function()
-               local character = Players.LocalPlayer.Character
-               if character and character:FindFirstChildOfClass("Humanoid") then
-                   local humanoid = character.Humanoid
-                   if humanoid:GetState() == Enum.HumanoidStateType.Freefall and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                       humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                   end
-               end
-           end)
-       else
-           RunService:UnbindFromRenderStep("BunnyHop")
-       end
-   end,
+    Name = "Bunny Hop",
+    CurrentValue = false,
+    Flag = "bunnyhop",
+    Callback = function(Value)
+        _G.bunnyHopEnabled = Value
+        if Value then
+            RunService:BindToRenderStep("BunnyHop", Enum.RenderPriority.Input.Value, function()
+                local character = Players.LocalPlayer.Character
+                if character and character:FindFirstChildOfClass("Humanoid") then
+                    local humanoid = character.Humanoid
+                    if humanoid:GetState() == Enum.HumanoidStateType.Freefall and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end)
+        else
+            RunService:UnbindFromRenderStep("BunnyHop")
+        end
+    end,
 })
 
 local InfiniteJumpToggle = MovementTab:CreateToggle({
-   Name = "Infinite Jump",
-   CurrentValue = false,
-   Flag = "infinitejump",
-   Callback = function(Value)
-       _G.infiniteJumpEnabled = Value
-       if Value then
-           UserInputService.JumpRequest:Connect(function()
-               if _G.infiniteJumpEnabled then
-                   local humanoid = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                   if humanoid then
-                       humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                   end
-               end
-           end)
-       end
-   end,
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "infinitejump",
+    Callback = function(Value)
+        _G.infiniteJumpEnabled = Value
+        if Value then
+            UserInputService.JumpRequest:Connect(function()
+                if _G.infiniteJumpEnabled then
+                    local humanoid = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end)
+        end
+    end,
 })
 
 local AirWalkToggle = MovementTab:CreateToggle({
-   Name = "Air Walk",
-   CurrentValue = false,
-   Flag = "airwalk",
-   Callback = function(Value)
-       _G.airWalkEnabled = Value
-       local platform = Instance.new("Part")
-       platform.Size = Vector3.new(5, 1, 5)
-       platform.Transparency = 1
-       platform.Anchored = true
-       platform.Parent = workspace
-       if Value then
-           RunService:BindToRenderStep("AirWalk", Enum.RenderPriority.Character.Value, function()
-               local character = Players.LocalPlayer.Character
-               if character and character:FindFirstChild("HumanoidRootPart") then
-                   platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3, 0)
-               end
-           end)
-       else
-           RunService:UnbindFromRenderStep("AirWalk")
-           platform:Destroy()
-       end
-   end,
+    Name = "Air Walk",
+    CurrentValue = false,
+    Flag = "airwalk",
+    Callback = function(Value)
+        _G.airWalkEnabled = Value
+        local platform = Instance.new("Part")
+        platform.Size = Vector3.new(5, 1, 5)
+        platform.Transparency = 1
+        platform.Anchored = true
+        platform.Parent = workspace
+        if Value then
+            RunService:BindToRenderStep("AirWalk", Enum.RenderPriority.Character.Value, function()
+                local character = Players.LocalPlayer.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3, 0)
+                end
+            end)
+        else
+            RunService:UnbindFromRenderStep("AirWalk")
+            platform:Destroy()
+        end
+    end,
 })
 
 local SpiderClimbToggle = MovementTab:CreateToggle({
-   Name = "Spider Climb",
-   CurrentValue = false,
-   Flag = "spiderclimb",
-   Callback = function(Value)
-       _G.spiderClimbEnabled = Value
-       if Value then
-           RunService:BindToRenderStep("SpiderClimb", Enum.RenderPriority.Input.Value, function()
-               local character = Players.LocalPlayer.Character
-               if character and character:FindFirstChild("HumanoidRootPart") and UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                   local ray = Ray.new(character.HumanoidRootPart.Position, character.HumanoidRootPart.CFrame.LookVector * 2)
-                   local hit, pos, normal = workspace:FindPartOnRay(ray, character)
-                   if hit then
-                       character.HumanoidRootPart.Velocity = normal * 50
-                   end
-               end
-           end)
-       else
-           RunService:UnbindFromRenderStep("SpiderClimb")
-       end
-   end,
+    Name = "Spider Climb",
+    CurrentValue = false,
+    Flag = "spiderclimb",
+    Callback = function(Value)
+        _G.spiderClimbEnabled = Value
+        if Value then
+            RunService:BindToRenderStep("SpiderClimb", Enum.RenderPriority.Input.Value, function()
+                local character = Players.LocalPlayer.Character
+                if character and character:FindFirstChild("HumanoidRootPart") and UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                    local ray = Ray.new(character.HumanoidRootPart.Position, character.HumanoidRootPart.CFrame.LookVector * 2)
+                    local hit, pos, normal = workspace:FindPartOnRay(ray, character)
+                    if hit then
+                        character.HumanoidRootPart.Velocity = normal * 50
+                    end
+                end
+            end)
+        else
+            RunService:UnbindFromRenderStep("SpiderClimb")
+        end
+    end,
 })
 
 local function getPlayerNames()
@@ -589,27 +591,27 @@ local function getPlayerNames()
 end
 
 local TeleportDropdown = MovementTab:CreateDropdown({
-   Name = "Teleport to Player",
-   Options = getPlayerNames(),
-   CurrentOption = {"Nobody"},
-   MultipleOptions = false,
-   Flag = "teleportplayer",
-   Callback = function(Option)
-       if Option[1] == "Nobody" then return end
-       local targetPlayer = Players:FindFirstChild(Option[1])
-       if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-           local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
-           local tween = TweenService:Create(Players.LocalPlayer.Character.HumanoidRootPart, tweenInfo, {CFrame = targetPlayer.Character.HumanoidRootPart.CFrame})
-           tween:Play()
-           myNotify({
-               Title = "Teleport",
-               Content = "Teleported to " .. targetPlayer.Name,
-               Duration = 3,
-               Image = 13047715178
-           })
-       end
-       TeleportDropdown:Set({"Nobody"})
-   end
+    Name = "Teleport to Player",
+    Options = getPlayerNames(),
+    CurrentOption = {"Nobody"},
+    MultipleOptions = false,
+    Flag = "teleportplayer",
+    Callback = function(Option)
+        if Option[1] == "Nobody" then return end
+        local targetPlayer = Players:FindFirstChild(Option[1])
+        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
+            local tween = TweenService:Create(Players.LocalPlayer.Character.HumanoidRootPart, tweenInfo, {CFrame = targetPlayer.Character.HumanoidRootPart.CFrame})
+            tween:Play()
+            myNotify({
+                Title = "Teleport",
+                Content = "Teleported to " .. targetPlayer.Name,
+                Duration = 3,
+                Image = 13047715178
+            })
+        end
+        TeleportDropdown:Set({"Nobody"})
+    end
 })
 
 Players.PlayerAdded:Connect(function()
@@ -624,25 +626,14 @@ local VisualsTab = Window:CreateTab("🎨 Visuals", nil)
 local VisualsSection = VisualsTab:CreateSection("Options")
 
 local espFeatures = {
-    box = false,
-    name = false,
-    distance = false,
-    health = false,
-    tracers = false,
-    teamFilter = false,
-    textOutline = true,
-    useTeamColors = false,
-    skeleton = false,
-    item = false,
-    chams = false
+    box = false, name = false, distance = false, health = false, tracers = false,
+    teamFilter = false, textOutline = true, useTeamColors = false, skeleton = false,
+    item = false, chams = false
 }
 local espColors = {
-    box = Color3.fromRGB(255, 255, 255),
-    text = Color3.fromRGB(255, 255, 255),
-    tracer = Color3.fromRGB(255, 255, 255),
-    skeleton = Color3.fromRGB(255, 255, 255),
-    item = Color3.fromRGB(0, 255, 0),
-    chams = Color3.fromRGB(255, 0, 0)
+    box = Color3.fromRGB(255, 255, 255), text = Color3.fromRGB(255, 255, 255),
+    tracer = Color3.fromRGB(255, 255, 255), skeleton = Color3.fromRGB(255, 255, 255),
+    item = Color3.fromRGB(0, 255, 0), chams = Color3.fromRGB(255, 0, 0)
 }
 local playerESP = {}
 local itemESP = {}
@@ -1048,305 +1039,305 @@ end)
 
 -- ESP Toggles and Color Pickers
 local BoxToggle = VisualsTab:CreateToggle({
-   Name = "Box ESP",
-   CurrentValue = false,
-   Flag = "boxesp",
-   Callback = function(Value)
-       toggleESPFeature("box", Value)
-   end,
+    Name = "Box ESP",
+    CurrentValue = false,
+    Flag = "boxesp",
+    Callback = function(Value)
+        toggleESPFeature("box", Value)
+    end,
 })
 
 local BoxColorPicker = VisualsTab:CreateColorPicker({
-   Name = "Box Color",
-   Color = Color3.fromRGB(255, 255, 255),
-   Flag = "boxcolor",
-   Callback = function(Color)
-       espColors.box = Color
-       for player, esp in pairs(playerESP) do
-           if esp.box then
-               esp.box.Color = getESPColor(player) or Color
-           end
-       end
-   end
+    Name = "Box Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "boxcolor",
+    Callback = function(Color)
+        espColors.box = Color
+        for player, esp in pairs(playerESP) do
+            if esp.box then
+                esp.box.Color = getESPColor(player) or Color
+            end
+        end
+    end
 })
 
 local NameToggle = VisualsTab:CreateToggle({
-   Name = "Name ESP",
-   CurrentValue = false,
-   Flag = "nameesp",
-   Callback = function(Value)
-       toggleESPFeature("name", Value)
-   end,
+    Name = "Name ESP",
+    CurrentValue = false,
+    Flag = "nameesp",
+    Callback = function(Value)
+        toggleESPFeature("name", Value)
+    end,
 })
 
 local DistanceToggle = VisualsTab:CreateToggle({
-   Name = "Distance ESP",
-   CurrentValue = false,
-   Flag = "distanceesp",
-   Callback = function(Value)
-       toggleESPFeature("distance", Value)
-   end,
+    Name = "Distance ESP",
+    CurrentValue = false,
+    Flag = "distanceesp",
+    Callback = function(Value)
+        toggleESPFeature("distance", Value)
+    end,
 })
 
 local HealthToggle = VisualsTab:CreateToggle({
-   Name = "Health ESP",
-   CurrentValue = false,
-   Flag = "healthesp",
-   Callback = function(Value)
-       toggleESPFeature("health", Value)
-   end,
+    Name = "Health ESP",
+    CurrentValue = false,
+    Flag = "healthesp",
+    Callback = function(Value)
+        toggleESPFeature("health", Value)
+    end,
 })
 
 local TextColorPicker = VisualsTab:CreateColorPicker({
-   Name = "Text Color",
-   Color = Color3.fromRGB(255, 255, 255),
-   Flag = "textcolor",
-   Callback = function(Color)
-       espColors.text = Color
-       for player, esp in pairs(playerESP) do
-           if esp.text then
-               esp.text.label.TextColor3 = getESPColor(player) or Color
-           end
-       end
-   end
+    Name = "Text Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "textcolor",
+    Callback = function(Color)
+        espColors.text = Color
+        for player, esp in pairs(playerESP) do
+            if esp.text then
+                esp.text.label.TextColor3 = getESPColor(player) or Color
+            end
+        end
+    end
 })
 
 local TextOutlineToggle = VisualsTab:CreateToggle({
-   Name = "Text Outline",
-   CurrentValue = true,
-   Flag = "textoutline",
-   Callback = function(Value)
-       espFeatures.textOutline = Value
-       updateTextOutline()
-   end,
+    Name = "Text Outline",
+    CurrentValue = true,
+    Flag = "textoutline",
+    Callback = function(Value)
+        espFeatures.textOutline = Value
+        updateTextOutline()
+    end,
 })
 
 local TracersToggle = VisualsTab:CreateToggle({
-   Name = "Tracers ESP",
-   CurrentValue = false,
-   Flag = "tracersesp",
-   Callback = function(Value)
-       toggleESPFeature("tracers", Value)
-   end,
+    Name = "Tracers ESP",
+    CurrentValue = false,
+    Flag = "tracersesp",
+    Callback = function(Value)
+        toggleESPFeature("tracers", Value)
+    end,
 })
 
 local TracerColorPicker = VisualsTab:CreateColorPicker({
-   Name = "Tracer Color",
-   Color = Color3.fromRGB(255, 255, 255),
-   Flag = "tracercolor",
-   Callback = function(Color)
-       espColors.tracer = Color
-       for player, esp in pairs(playerESP) do
-           if esp.tracer then
-               esp.tracer.Color = getESPColor(player) or Color
-           end
-       end
-   end
+    Name = "Tracer Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "tracercolor",
+    Callback = function(Color)
+        espColors.tracer = Color
+        for player, esp in pairs(playerESP) do
+            if esp.tracer then
+                esp.tracer.Color = getESPColor(player) or Color
+            end
+        end
+    end
 })
 
 local SkeletonToggle = VisualsTab:CreateToggle({
-   Name = "Skeleton ESP",
-   CurrentValue = false,
-   Flag = "skeletonesp",
-   Callback = function(Value)
-       toggleESPFeature("skeleton", Value)
-   end,
+    Name = "Skeleton ESP",
+    CurrentValue = false,
+    Flag = "skeletonesp",
+    Callback = function(Value)
+        toggleESPFeature("skeleton", Value)
+    end,
 })
 
 local SkeletonColorPicker = VisualsTab:CreateColorPicker({
-   Name = "Skeleton Color",
-   Color = Color3.fromRGB(255, 255, 255),
-   Flag = "skeletoncolor",
-   Callback = function(Color)
-       espColors.skeleton = Color
-       for player, esp in pairs(playerESP) do
-           if esp.skeleton then
-               for _, line in pairs(esp.skeleton) do
-                   line.Color = getESPColor(player) or Color
-               end
-           end
-       end
-   end
+    Name = "Skeleton Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "skeletoncolor",
+    Callback = function(Color)
+        espColors.skeleton = Color
+        for player, esp in pairs(playerESP) do
+            if esp.skeleton then
+                for _, line in pairs(esp.skeleton) do
+                    line.Color = getESPColor(player) or Color
+                end
+            end
+        end
+    end
 })
 
 local ItemESPToggle = VisualsTab:CreateToggle({
-   Name = "Item ESP",
-   CurrentValue = false,
-   Flag = "itemesp",
-   Callback = function(Value)
-       toggleESPFeature("item", Value)
-   end,
+    Name = "Item ESP",
+    CurrentValue = false,
+    Flag = "itemesp",
+    Callback = function(Value)
+        toggleESPFeature("item", Value)
+    end,
 })
 
 local ItemColorPicker = VisualsTab:CreateColorPicker({
-   Name = "Item Color",
-   Color = Color3.fromRGB(0, 255, 0),
-   Flag = "itemcolor",
-   Callback = function(Color)
-       espColors.item = Color
-       for _, data in pairs(itemESP) do
-           data.highlight.FillColor = Color
-           data.highlight.OutlineColor = Color
-       end
-   end
+    Name = "Item Color",
+    Color = Color3.fromRGB(0, 255, 0),
+    Flag = "itemcolor",
+    Callback = function(Color)
+        espColors.item = Color
+        for _, data in pairs(itemESP) do
+            data.highlight.FillColor = Color
+            data.highlight.OutlineColor = Color
+        end
+    end
 })
 
 local ChamsToggle = VisualsTab:CreateToggle({
-   Name = "Chams",
-   CurrentValue = false,
-   Flag = "chams",
-   Callback = function(Value)
-       toggleESPFeature("chams", Value)
-   end,
+    Name = "Chams",
+    CurrentValue = false,
+    Flag = "chams",
+    Callback = function(Value)
+        toggleESPFeature("chams", Value)
+    end,
 })
 
 local ChamsColorPicker = VisualsTab:CreateColorPicker({
-   Name = "Chams Color",
-   Color = Color3.fromRGB(255, 0, 0),
-   Flag = "chamscolor",
-   Callback = function(Color)
-       espColors.chams = Color
-       for player, esp in pairs(playerESP) do
-           if esp.chams then
-               esp.chams.FillColor = getESPColor(player) or Color
-           end
-       end
-   end
+    Name = "Chams Color",
+    Color = Color3.fromRGB(255, 0, 0),
+    Flag = "chamscolor",
+    Callback = function(Color)
+        espColors.chams = Color
+        for player, esp in pairs(playerESP) do
+            if esp.chams then
+                esp.chams.FillColor = getESPColor(player) or Color
+            end
+        end
+    end
 })
 
 local TeamFilterToggle = VisualsTab:CreateToggle({
-   Name = "Team Filter",
-   CurrentValue = false,
-   Flag = "teamfilter",
-   Callback = function(Value)
-       espFeatures.teamFilter = Value
-       for _, player in pairs(Players:GetPlayers()) do
-           if playerESP[player] then
-               for feature in pairs(playerESP[player]) do
-                   if feature ~= "connections" then
-                       if feature == "box" or feature == "tracer" then
-                           playerESP[player][feature]:Remove()
-                       elseif feature == "skeleton" then
-                           for _, line in pairs(playerESP[player].skeleton) do
-                               line:Remove()
-                           end
-                       elseif feature == "text" then
-                           playerESP[player].text.gui:Destroy()
-                       elseif feature == "chams" then
-                           playerESP[player].chams:Destroy()
-                       end
-                       playerESP[player][feature] = nil
-                   end
-               end
-           end
-           if shouldShowESP(player) and player.Character then
-               if espFeatures.box then createBox(player) end
-               if espFeatures.tracers then createTracer(player) end
-               if espFeatures.skeleton then createSkeleton(player) end
-               if espFeatures.chams then addChams(player) end
-               if espFeatures.name or espFeatures.distance or espFeatures.health then
-                   createTextESP(player)
-                   updateTextESP(player)
-               end
-           end
-       end
-   end,
+    Name = "Team Filter",
+    CurrentValue = false,
+    Flag = "teamfilter",
+    Callback = function(Value)
+        espFeatures.teamFilter = Value
+        for _, player in pairs(Players:GetPlayers()) do
+            if playerESP[player] then
+                for feature in pairs(playerESP[player]) do
+                    if feature ~= "connections" then
+                        if feature == "box" or feature == "tracer" then
+                            playerESP[player][feature]:Remove()
+                        elseif feature == "skeleton" then
+                            for _, line in pairs(playerESP[player].skeleton) do
+                                line:Remove()
+                            end
+                        elseif feature == "text" then
+                            playerESP[player].text.gui:Destroy()
+                        elseif feature == "chams" then
+                            playerESP[player].chams:Destroy()
+                        end
+                        playerESP[player][feature] = nil
+                    end
+                end
+            end
+            if shouldShowESP(player) and player.Character then
+                if espFeatures.box then createBox(player) end
+                if espFeatures.tracers then createTracer(player) end
+                if espFeatures.skeleton then createSkeleton(player) end
+                if espFeatures.chams then addChams(player) end
+                if espFeatures.name or espFeatures.distance or espFeatures.health then
+                    createTextESP(player)
+                    updateTextESP(player)
+                end
+            end
+        end
+    end,
 })
 
 local UseTeamColorsToggle = VisualsTab:CreateToggle({
-   Name = "Use Team Colors",
-   CurrentValue = false,
-   Flag = "useteamcolors",
-   Callback = function(Value)
-       espFeatures.useTeamColors = Value
-       for _, player in pairs(Players:GetPlayers()) do
-           if playerESP[player] then
-               if playerESP[player].box then
-                   playerESP[player].box.Color = getESPColor(player) or espColors.box
-               end
-               if playerESP[player].text then
-                   playerESP[player].text.label.TextColor3 = getESPColor(player) or espColors.text
-               end
-               if playerESP[player].tracer then
-                   playerESP[player].tracer.Color = getESPColor(player) or espColors.tracer
-               end
-               if playerESP[player].skeleton then
-                   for _, line in pairs(playerESP[player].skeleton) do
-                       line.Color = getESPColor(player) or espColors.skeleton
-                   end
-               end
-               if playerESP[player].chams then
-                   playerESP[player].chams.FillColor = getESPColor(player) or espColors.chams
-               end
-           end
-       end
-   end,
+    Name = "Use Team Colors",
+    CurrentValue = false,
+    Flag = "useteamcolors",
+    Callback = function(Value)
+        espFeatures.useTeamColors = Value
+        for _, player in pairs(Players:GetPlayers()) do
+            if playerESP[player] then
+                if playerESP[player].box then
+                    playerESP[player].box.Color = getESPColor(player) or espColors.box
+                end
+                if playerESP[player].text then
+                    playerESP[player].text.label.TextColor3 = getESPColor(player) or espColors.text
+                end
+                if playerESP[player].tracer then
+                    playerESP[player].tracer.Color = getESPColor(player) or espColors.tracer
+                end
+                if playerESP[player].skeleton then
+                    for _, line in pairs(playerESP[player].skeleton) do
+                        line.Color = getESPColor(player) or espColors.skeleton
+                    end
+                end
+                if playerESP[player].chams then
+                    playerESP[player].chams.FillColor = getESPColor(player) or espColors.chams
+                end
+            end
+        end
+    end,
 })
 
 local FullbrightToggle = VisualsTab:CreateToggle({
-   Name = "Fullbright",
-   CurrentValue = false,
-   Flag = "fullbright",
-   Callback = function(Value)
-       if Value then
-           Lighting.Brightness = 2
-           Lighting.GlobalShadows = false
-           Lighting.FogEnd = 9e9
-       else
-           Lighting.Brightness = 1
-           Lighting.GlobalShadows = true
-           Lighting.FogEnd = 1000
-       end
-   end,
+    Name = "Fullbright",
+    CurrentValue = false,
+    Flag = "fullbright",
+    Callback = function(Value)
+        if Value then
+            Lighting.Brightness = 2
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+        else
+            Lighting.Brightness = 1
+            Lighting.GlobalShadows = true
+            Lighting.FogEnd = 1000
+        end
+    end,
 })
 
 local CrosshairToggle = VisualsTab:CreateToggle({
-   Name = "Custom Crosshair",
-   CurrentValue = false,
-   Flag = "crosshair",
-   Callback = function(Value)
-       local crosshair = Drawing.new("Circle")
-       crosshair.Visible = Value
-       crosshair.Color = Color3.fromRGB(255, 0, 0)
-       crosshair.Thickness = 1
-       crosshair.NumSides = 100
-       crosshair.Radius = 5
-       crosshair.Filled = true
-       crosshair.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-       if Value then
-           RunService:BindToRenderStep("Crosshair", Enum.RenderPriority.Camera.Value, function()
-               crosshair.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-           end)
-       else
-           RunService:UnbindFromRenderStep("Crosshair")
-           crosshair:Remove()
-       end
-   end,
+    Name = "Custom Crosshair",
+    CurrentValue = false,
+    Flag = "crosshair",
+    Callback = function(Value)
+        local crosshair = Drawing.new("Circle")
+        crosshair.Visible = Value
+        crosshair.Color = Color3.fromRGB(255, 0, 0)
+        crosshair.Thickness = 1
+        crosshair.NumSides = 100
+        crosshair.Radius = 5
+        crosshair.Filled = true
+        crosshair.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        if Value then
+            RunService:BindToRenderStep("Crosshair", Enum.RenderPriority.Camera.Value, function()
+                crosshair.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            end)
+        else
+            RunService:UnbindFromRenderStep("Crosshair")
+            crosshair:Remove()
+        end
+    end,
 })
 
 local FOVChangerSlider = VisualsTab:CreateSlider({
-   Name = "FOV Changer",
-   Range = {30, 120},
-   Increment = 1,
-   Suffix = "Degrees",
-   CurrentValue = 70,
-   Flag = "fovchanger",
-   Callback = function(Value)
-       Camera.FieldOfView = Value
-   end,
+    Name = "FOV Changer",
+    Range = {30, 120},
+    Increment = 1,
+    Suffix = "Degrees",
+    CurrentValue = 70,
+    Flag = "fovchanger",
+    Callback = function(Value)
+        Camera.FieldOfView = Value
+    end,
 })
 
 local XRayToggle = VisualsTab:CreateToggle({
-   Name = "X-Ray (Transparent Walls)",
-   CurrentValue = false,
-   Flag = "xray",
-   Callback = function(Value)
-       for _, part in pairs(workspace:GetDescendants()) do
-           if part:IsA("BasePart") and not part.Parent:FindFirstChildOfClass("Humanoid") then
-               part.Transparency = Value and 0.5 or 0
-           end
-       end
-   end,
+    Name = "X-Ray (Transparent Walls)",
+    CurrentValue = false,
+    Flag = "xray",
+    Callback = function(Value)
+        for _, part in pairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") and not part.Parent:FindFirstChildOfClass("Humanoid") then
+                part.Transparency = Value and 0.5 or 0
+            end
+        end
+    end,
 })
 
 -- Combat Tab
@@ -1607,167 +1598,167 @@ end
 
 -- Combat Toggles and Options
 local AimbotToggle = CombatTab:CreateToggle({
-   Name = "Enable Aimbot",
-   CurrentValue = false,
-   Flag = "aimbotenable",
-   Callback = function(Value)
-       toggleAimbot(Value)
-   end,
+    Name = "Enable Aimbot",
+    CurrentValue = false,
+    Flag = "aimbotenable",
+    Callback = function(Value)
+        toggleAimbot(Value)
+    end,
 })
 
 local TargetPartDropdown = CombatTab:CreateDropdown({
-   Name = "Target Part",
-   Options = {"Head", "HumanoidRootPart", "Torso"},
-   CurrentOption = {"Head"},
-   MultipleOptions = false,
-   Flag = "targetpart",
-   Callback = function(Option)
-       aimbotTargetPart = Option[1]
-   end,
+    Name = "Target Part",
+    Options = {"Head", "HumanoidRootPart", "Torso"},
+    CurrentOption = {"Head"},
+    MultipleOptions = false,
+    Flag = "targetpart",
+    Callback = function(Option)
+        aimbotTargetPart = Option[1]
+    end,
 })
 
 local FOVSlider = CombatTab:CreateSlider({
-   Name = "FOV Size",
-   Range = {0, 500},
-   Increment = 10,
-   Suffix = "Radius",
-   CurrentValue = 200,
-   Flag = "fovsize",
-   Callback = function(Value)
-       aimbotFOV = Value
-   end,
+    Name = "FOV Size",
+    Range = {0, 500},
+    Increment = 10,
+    Suffix = "Radius",
+    CurrentValue = 200,
+    Flag = "fovsize",
+    Callback = function(Value)
+        aimbotFOV = Value
+    end,
 })
 
 local SmoothnessSlider = CombatTab:CreateSlider({
-   Name = "Smoothness",
-   Range = {0, 1},
-   Increment = 0.1,
-   Suffix = "Factor",
-   CurrentValue = 0.5,
-   Flag = "smoothness",
-   Callback = function(Value)
-       aimbotSmoothness = Value
-   end,
+    Name = "Smoothness",
+    Range = {0, 1},
+    Increment = 0.1,
+    Suffix = "Factor",
+    CurrentValue = 0.5,
+    Flag = "smoothness",
+    Callback = function(Value)
+        aimbotSmoothness = Value
+    end,
 })
 
 local VisibleCheckToggle = CombatTab:CreateToggle({
-   Name = "Visible Check",
-   CurrentValue = false,
-   Flag = "visiblecheck",
-   Callback = function(Value)
-       aimbotVisibleCheck = Value
-   end,
+    Name = "Visible Check",
+    CurrentValue = false,
+    Flag = "visiblecheck",
+    Callback = function(Value)
+        aimbotVisibleCheck = Value
+    end,
 })
 
 local AimbotTeamFilterToggle = CombatTab:CreateToggle({
-   Name = "Team Filter",
-   CurrentValue = false,
-   Flag = "aimbotteamfilter",
-   Callback = function(Value)
-       aimbotTeamFilter = Value
-   end,
+    Name = "Team Filter",
+    CurrentValue = false,
+    Flag = "aimbotteamfilter",
+    Callback = function(Value)
+        aimbotTeamFilter = Value
+    end,
 })
 
 local ShowFOVToggle = CombatTab:CreateToggle({
-   Name = "Show FOV Circle",
-   CurrentValue = false,
-   Flag = "showfov",
-   Callback = function(Value)
-       showFOV = Value
-   end,
+    Name = "Show FOV Circle",
+    CurrentValue = false,
+    Flag = "showfov",
+    Callback = function(Value)
+        showFOV = Value
+    end,
 })
 
 local FOVColorPicker = CombatTab:CreateColorPicker({
-   Name = "FOV Color",
-   Color = Color3.fromRGB(255, 0, 0),
-   Flag = "fovcolor",
-   Callback = function(Color)
-       fovColor = Color
-   end
+    Name = "FOV Color",
+    Color = Color3.fromRGB(255, 0, 0),
+    Flag = "fovcolor",
+    Callback = function(Color)
+        fovColor = Color
+    end
 })
 
 local TriggerbotToggle = CombatTab:CreateToggle({
-   Name = "Triggerbot",
-   CurrentValue = false,
-   Flag = "triggerbot",
-   Callback = function(Value)
-       toggleTriggerbot(Value)
-   end,
+    Name = "Triggerbot",
+    CurrentValue = false,
+    Flag = "triggerbot",
+    Callback = function(Value)
+        toggleTriggerbot(Value)
+    end,
 })
 
 local AutoHeadshotToggle = CombatTab:CreateToggle({
-   Name = "Auto Headshot",
-   CurrentValue = false,
-   Flag = "autoheadshot",
-   Callback = function(Value)
-       toggleAutoHeadshot(Value)
-   end,
+    Name = "Auto Headshot",
+    CurrentValue = false,
+    Flag = "autoheadshot",
+    Callback = function(Value)
+        toggleAutoHeadshot(Value)
+    end,
 })
 
 local SilentAimToggle = CombatTab:CreateToggle({
-   Name = "Silent Aim",
-   CurrentValue = false,
-   Flag = "silentaim",
-   Callback = function(Value)
-       toggleSilentAim(Value)
-   end,
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Flag = "silentaim",
+    Callback = function(Value)
+        toggleSilentAim(Value)
+    end,
 })
 
 local HitboxExpanderToggle = CombatTab:CreateToggle({
-   Name = "Hitbox Expander",
-   CurrentValue = false,
-   Flag = "hitboxexpander",
-   Callback = function(Value)
-       toggleHitboxExpander(Value)
-   end,
+    Name = "Hitbox Expander",
+    CurrentValue = false,
+    Flag = "hitboxexpander",
+    Callback = function(Value)
+        toggleHitboxExpander(Value)
+    end,
 })
 
 local HitboxSizeSlider = CombatTab:CreateSlider({
-   Name = "Hitbox Size",
-   Range = {1, 20},
-   Increment = 1,
-   Suffix = "Size",
-   CurrentValue = 5,
-   Flag = "hitboxsize",
-   Callback = function(Value)
-       hitboxSize = Value
-       if hitboxExpanderEnabled then
-           toggleHitboxExpander(false)
-           toggleHitboxExpander(true)
-       end
-   end,
+    Name = "Hitbox Size",
+    Range = {1, 20},
+    Increment = 1,
+    Suffix = "Size",
+    CurrentValue = 5,
+    Flag = "hitboxsize",
+    Callback = function(Value)
+        hitboxSize = Value
+        if hitboxExpanderEnabled then
+            toggleHitboxExpander(false)
+            toggleHitboxExpander(true)
+        end
+    end,
 })
 
 local HitboxTransparencySlider = CombatTab:CreateSlider({
-   Name = "Hitbox Transparency",
-   Range = {0, 1},
-   Increment = 0.1,
-   Suffix = "Transparency",
-   CurrentValue = 0.5,
-   Flag = "hitboxtrans",
-   Callback = function(Value)
-       hitboxTransparency = Value
-       if hitboxExpanderEnabled then
-           toggleHitboxExpander(false)
-           toggleHitboxExpander(true)
-       end
-   end,
+    Name = "Hitbox Transparency",
+    Range = {0, 1},
+    Increment = 0.1,
+    Suffix = "Transparency",
+    CurrentValue = 0.5,
+    Flag = "hitboxtrans",
+    Callback = function(Value)
+        hitboxTransparency = Value
+        if hitboxExpanderEnabled then
+            toggleHitboxExpander(false)
+            toggleHitboxExpander(true)
+        end
+    end,
 })
 
 local RapidFireToggle = CombatTab:CreateToggle({
-   Name = "Rapid Fire",
-   CurrentValue = false,
-   Flag = "rapidfire",
-   Callback = function(Value)
-       toggleRapidFire(Value)
-   end,
+    Name = "Rapid Fire",
+    CurrentValue = false,
+    Flag = "rapidfire",
+    Callback = function(Value)
+        toggleRapidFire(Value)
+    end,
 })
 
 local KillAllButton = CombatTab:CreateButton({
-   Name = "Kill All",
-   Callback = function()
-       killAll()
-   end,
+    Name = "Kill All",
+    Callback = function()
+        killAll()
+    end,
 })
 
 -- Exploits Tab
@@ -1960,85 +1951,85 @@ local function serverCrash()
 end
 
 local InfiniteAmmoToggle = ExploitsTab:CreateToggle({
-   Name = "Infinite Ammo",
-   CurrentValue = false,
-   Flag = "infiniteammo",
-   Callback = function(Value)
-       toggleInfiniteAmmo(Value)
-   end,
+    Name = "Infinite Ammo",
+    CurrentValue = false,
+    Flag = "infiniteammo",
+    Callback = function(Value)
+        toggleInfiniteAmmo(Value)
+    end,
 })
 
 local NoRecoilToggle = ExploitsTab:CreateToggle({
-   Name = "No Recoil",
-   CurrentValue = false,
-   Flag = "norecoil",
-   Callback = function(Value)
-       toggleNoRecoil(Value)
-   end,
+    Name = "No Recoil",
+    CurrentValue = false,
+    Flag = "norecoil",
+    Callback = function(Value)
+        toggleNoRecoil(Value)
+    end,
 })
 
 local NoSpreadToggle = ExploitsTab:CreateToggle({
-   Name = "No Spread",
-   CurrentValue = false,
-   Flag = "nospread",
-   Callback = function(Value)
-       toggleNoSpread(Value)
-   end,
+    Name = "No Spread",
+    CurrentValue = false,
+    Flag = "nospread",
+    Callback = function(Value)
+        toggleNoSpread(Value)
+    end,
 })
 
 local GodModeToggle = ExploitsTab:CreateToggle({
-   Name = "God Mode",
-   CurrentValue = false,
-   Flag = "godmode",
-   Callback = function(Value)
-       toggleGodMode(Value)
-   end,
+    Name = "God Mode",
+    CurrentValue = false,
+    Flag = "godmode",
+    Callback = function(Value)
+        toggleGodMode(Value)
+    end,
 })
 
 local AntiAFKToggle = ExploitsTab:CreateToggle({
-   Name = "Anti-AFK",
-   CurrentValue = false,
-   Flag = "antiafk",
-   Callback = function(Value)
-       toggleAntiAFK(Value)
-   end,
+    Name = "Anti-AFK",
+    CurrentValue = false,
+    Flag = "antiafk",
+    Callback = function(Value)
+        toggleAntiAFK(Value)
+    end,
 })
 
 local GiveItemInput = ExploitsTab:CreateInput({
-   Name = "Give Item",
-   PlaceholderText = "Enter item name",
-   RemoveTextAfterFocusLost = true,
-   Callback = function(Text)
-       giveItem(Text)
-   end,
+    Name = "Give Item",
+    PlaceholderText = "Enter item name",
+    RemoveTextAfterFocusLost = true,
+    Callback = function(Text)
+        giveItem(Text)
+    end,
 })
 
 local ServerCrashButton = ExploitsTab:CreateButton({
-   Name = "Server Crash (WARNING)",
-   Callback = function()
-       myNotify({
-           Title = "Server Crash",
-           Content = "Attempting to crash server... Use with caution!",
-           Duration = 3,
-           Image = 13047715178
-       })
-       serverCrash()
-   end,
+    Name = "Server Crash (WARNING)",
+    Callback = function()
+        myNotify({
+            Title = "Server Crash",
+            Content = "Attempting to crash server... Use with caution!",
+            Duration = 3,
+            Image = 13047715178
+        })
+        serverCrash()
+    end,
 })
 
 local ServerHopButton = ExploitsTab:CreateButton({
-   Name = "Server Hop",
-   Callback = function()
-       local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
-       local serverId = servers.data[math.random(1, #servers.data)].id
-       TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId)
-       myNotify({
-           Title = "Server Hop",
-           Content = "Hopping to a new server...",
-           Duration = 3,
-           Image = 13047715178
-       })
-   end,
+    Name = "Server Hop",
+    Callback = function()
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        local serverId = servers.data[math.random(1, #servers.data)].id
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId)
+        myNotify({
+            Title = "Server Hop",
+            Content = "Hopping to a new server...",
+            Duration = 3,
+            Image = 13047715178
+        })
+    end,
 })
 
 -- Settings Tab
@@ -2096,21 +2087,3 @@ local InteractHighlightColorPicker = SettingsTab:CreateColorPicker({
        end
    end
 })
-
-local FPSUnlockerToggle = SettingsTab:CreateToggle({
-   Name = "FPS Unlocker",
-   CurrentValue = false,
-   Flag = "fpsunlocker",
-   Callback = function(Value)
-       if Value then
-           setfpscap(999)
-       else
-           setfpscap(60)
-       end
-       myNotify({
-           Title = "FPS Unlocker",
-           Content = "FPS Unlocker " .. (Value and "enabled!" or "disabled!"),
-           Duration = 3,
-           Image = 13047715178
-       })
-   end,
