@@ -29,7 +29,7 @@ local Window = PRISM:CreateWindow({
       FileName = "Config"
    },
    Discord = {
-      Enabled = false,
+      Enabled = true,
       Invite = "gcjaDpMYce",
       RememberJoins = true
    },
